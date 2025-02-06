@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include "Platform/Platform.hpp"
+
 int main() {
-    printf("Hello World\n");
+    alert("Hello World\n");
 }
