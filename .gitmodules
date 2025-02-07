@@ -7,3 +7,6 @@
 [submodule "src/external/volk"]
 	path = src/external/volk
 	url = https://github.com/zeux/volk
+[submodule "src/external/glm"]
+	path = src/external/glm
+	url = https://github.com/g-truc/glm
