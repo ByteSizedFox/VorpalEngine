@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o CMakeFiles/vorpal_engine.dir/src/main.c.o CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o -o vorpal_engine  src/external/glfw/src/libglfw3.a /usr/lib64/librt.a -lm -ldl
