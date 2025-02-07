@@ -54,4 +54,5 @@ static void createInstance() {
     if (vkCreateInstance(&createInfo, nullptr, &Engine::vk_instance) != VK_SUCCESS) {
         throw std::runtime_error("failed to create instance!");
     }
+    volkLoadInstance(Engine::vk_instance);
 }

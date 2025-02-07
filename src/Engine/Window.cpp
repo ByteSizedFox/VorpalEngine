@@ -2,7 +2,6 @@
 #include "Engine/Engine.h"
 
 static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-    auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
     Engine::framebufferResized = true;
 }
 

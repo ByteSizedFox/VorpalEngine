@@ -213,85 +213,74 @@ update_mappings/fast:
 	$(MAKE) $(MAKESILENT) -f src/external/glfw/src/CMakeFiles/update_mappings.dir/build.make src/external/glfw/src/CMakeFiles/update_mappings.dir/build
 .PHONY : update_mappings/fast
 
-src/Engine/Engine.o: src/Engine/Engine.c.o
-.PHONY : src/Engine/Engine.o
+#=============================================================================
+# Target rules for targets named glm
+
+# Build rule for target.
+glm: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 glm
+.PHONY : glm
+
+# fast build rule for target.
+glm/fast:
+	$(MAKE) $(MAKESILENT) -f src/external/glm/glm/CMakeFiles/glm.dir/build.make src/external/glm/glm/CMakeFiles/glm.dir/build
+.PHONY : glm/fast
+
+src/Engine/Window.obj: src/Engine/Window.cpp.obj
+.PHONY : src/Engine/Window.obj
 
 # target to build an object file
-src/Engine/Engine.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o
-.PHONY : src/Engine/Engine.c.o
+src/Engine/Window.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj
+.PHONY : src/Engine/Window.cpp.obj
 
-src/Engine/Engine.i: src/Engine/Engine.c.i
-.PHONY : src/Engine/Engine.i
+src/Engine/Window.i: src/Engine/Window.cpp.i
+.PHONY : src/Engine/Window.i
 
 # target to preprocess a source file
-src/Engine/Engine.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.i
-.PHONY : src/Engine/Engine.c.i
+src/Engine/Window.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.i
+.PHONY : src/Engine/Window.cpp.i
 
-src/Engine/Engine.s: src/Engine/Engine.c.s
-.PHONY : src/Engine/Engine.s
-
-# target to generate assembly for a file
-src/Engine/Engine.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.s
-.PHONY : src/Engine/Engine.c.s
-
-src/Engine/VulkanUtils.o: src/Engine/VulkanUtils.c.o
-.PHONY : src/Engine/VulkanUtils.o
-
-# target to build an object file
-src/Engine/VulkanUtils.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o
-.PHONY : src/Engine/VulkanUtils.c.o
-
-src/Engine/VulkanUtils.i: src/Engine/VulkanUtils.c.i
-.PHONY : src/Engine/VulkanUtils.i
-
-# target to preprocess a source file
-src/Engine/VulkanUtils.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.i
-.PHONY : src/Engine/VulkanUtils.c.i
-
-src/Engine/VulkanUtils.s: src/Engine/VulkanUtils.c.s
-.PHONY : src/Engine/VulkanUtils.s
+src/Engine/Window.s: src/Engine/Window.cpp.s
+.PHONY : src/Engine/Window.s
 
 # target to generate assembly for a file
-src/Engine/VulkanUtils.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.s
-.PHONY : src/Engine/VulkanUtils.c.s
+src/Engine/Window.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.s
+.PHONY : src/Engine/Window.cpp.s
 
-src/Platform/Platform.o: src/Platform/Platform.c.o
-.PHONY : src/Platform/Platform.o
+src/Platform/Platform.obj: src/Platform/Platform.cpp.obj
+.PHONY : src/Platform/Platform.obj
 
 # target to build an object file
-src/Platform/Platform.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o
-.PHONY : src/Platform/Platform.c.o
+src/Platform/Platform.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj
+.PHONY : src/Platform/Platform.cpp.obj
 
-src/Platform/Platform.i: src/Platform/Platform.c.i
+src/Platform/Platform.i: src/Platform/Platform.cpp.i
 .PHONY : src/Platform/Platform.i
 
 # target to preprocess a source file
-src/Platform/Platform.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.i
-.PHONY : src/Platform/Platform.c.i
+src/Platform/Platform.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.i
+.PHONY : src/Platform/Platform.cpp.i
 
-src/Platform/Platform.s: src/Platform/Platform.c.s
+src/Platform/Platform.s: src/Platform/Platform.cpp.s
 .PHONY : src/Platform/Platform.s
 
 # target to generate assembly for a file
-src/Platform/Platform.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.s
-.PHONY : src/Platform/Platform.c.s
+src/Platform/Platform.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.s
+.PHONY : src/Platform/Platform.cpp.s
 
-src/external/volk/volk.o: src/external/volk/volk.c.o
-.PHONY : src/external/volk/volk.o
+src/external/volk/volk.obj: src/external/volk/volk.c.obj
+.PHONY : src/external/volk/volk.obj
 
 # target to build an object file
-src/external/volk/volk.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o
-.PHONY : src/external/volk/volk.c.o
+src/external/volk/volk.c.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj
+.PHONY : src/external/volk/volk.c.obj
 
 src/external/volk/volk.i: src/external/volk/volk.c.i
 .PHONY : src/external/volk/volk.i
@@ -309,29 +298,29 @@ src/external/volk/volk.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.s
 .PHONY : src/external/volk/volk.c.s
 
-src/main.o: src/main.c.o
-.PHONY : src/main.o
+src/main.obj: src/main.cpp.obj
+.PHONY : src/main.obj
 
 # target to build an object file
-src/main.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/main.c.o
-.PHONY : src/main.c.o
+src/main.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/main.cpp.obj
+.PHONY : src/main.cpp.obj
 
-src/main.i: src/main.c.i
+src/main.i: src/main.cpp.i
 .PHONY : src/main.i
 
 # target to preprocess a source file
-src/main.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/main.c.i
-.PHONY : src/main.c.i
+src/main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/main.cpp.i
+.PHONY : src/main.cpp.i
 
-src/main.s: src/main.c.s
+src/main.s: src/main.cpp.s
 .PHONY : src/main.s
 
 # target to generate assembly for a file
-src/main.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/main.c.s
-.PHONY : src/main.c.s
+src/main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vorpal_engine.dir/build.make CMakeFiles/vorpal_engine.dir/src/main.cpp.s
+.PHONY : src/main.cpp.s
 
 # Help Target
 help:
@@ -348,20 +337,18 @@ help:
 	@echo "... uninstall"
 	@echo "... update_mappings"
 	@echo "... glfw"
+	@echo "... glm"
 	@echo "... vorpal_engine"
-	@echo "... src/Engine/Engine.o"
-	@echo "... src/Engine/Engine.i"
-	@echo "... src/Engine/Engine.s"
-	@echo "... src/Engine/VulkanUtils.o"
-	@echo "... src/Engine/VulkanUtils.i"
-	@echo "... src/Engine/VulkanUtils.s"
-	@echo "... src/Platform/Platform.o"
+	@echo "... src/Engine/Window.obj"
+	@echo "... src/Engine/Window.i"
+	@echo "... src/Engine/Window.s"
+	@echo "... src/Platform/Platform.obj"
 	@echo "... src/Platform/Platform.i"
 	@echo "... src/Platform/Platform.s"
-	@echo "... src/external/volk/volk.o"
+	@echo "... src/external/volk/volk.obj"
 	@echo "... src/external/volk/volk.i"
 	@echo "... src/external/volk/volk.s"
-	@echo "... src/main.o"
+	@echo "... src/main.obj"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
 .PHONY : help

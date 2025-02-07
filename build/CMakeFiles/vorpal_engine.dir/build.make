@@ -69,102 +69,92 @@ include CMakeFiles/vorpal_engine.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/vorpal_engine.dir/flags.make
 
-CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o: CMakeFiles/vorpal_engine.dir/flags.make
-CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o: /home/user/Documents/VorpalEngine/src/Engine/Engine.c
-CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building C object CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o -MF CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o.d -o CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o -c /home/user/Documents/VorpalEngine/src/Engine/Engine.c
+CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj: CMakeFiles/vorpal_engine.dir/flags.make
+CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj: CMakeFiles/vorpal_engine.dir/includes_CXX.rsp
+CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj: /home/user/Documents/VorpalEngine/src/Engine/Window.cpp
+CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj -MF CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj.d -o CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj -c /home/user/Documents/VorpalEngine/src/Engine/Window.cpp
 
-CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.i"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/user/Documents/VorpalEngine/src/Engine/Engine.c > CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.i
+CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/Documents/VorpalEngine/src/Engine/Window.cpp > CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.i
 
-CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.s"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/user/Documents/VorpalEngine/src/Engine/Engine.c -o CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.s
+CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/Documents/VorpalEngine/src/Engine/Window.cpp -o CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.s
 
-CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o: CMakeFiles/vorpal_engine.dir/flags.make
-CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o: /home/user/Documents/VorpalEngine/src/Engine/VulkanUtils.c
-CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building C object CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o -MF CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o.d -o CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o -c /home/user/Documents/VorpalEngine/src/Engine/VulkanUtils.c
+CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj: CMakeFiles/vorpal_engine.dir/flags.make
+CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj: CMakeFiles/vorpal_engine.dir/includes_CXX.rsp
+CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj: /home/user/Documents/VorpalEngine/src/Platform/Platform.cpp
+CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj -MF CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj.d -o CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj -c /home/user/Documents/VorpalEngine/src/Platform/Platform.cpp
 
-CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.i"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/user/Documents/VorpalEngine/src/Engine/VulkanUtils.c > CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.i
+CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/Documents/VorpalEngine/src/Platform/Platform.cpp > CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.i
 
-CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.s"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/user/Documents/VorpalEngine/src/Engine/VulkanUtils.c -o CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.s
+CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/Documents/VorpalEngine/src/Platform/Platform.cpp -o CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.s
 
-CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o: CMakeFiles/vorpal_engine.dir/flags.make
-CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o: /home/user/Documents/VorpalEngine/src/Platform/Platform.c
-CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building C object CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o -MF CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o.d -o CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o -c /home/user/Documents/VorpalEngine/src/Platform/Platform.c
+CMakeFiles/vorpal_engine.dir/src/main.cpp.obj: CMakeFiles/vorpal_engine.dir/flags.make
+CMakeFiles/vorpal_engine.dir/src/main.cpp.obj: CMakeFiles/vorpal_engine.dir/includes_CXX.rsp
+CMakeFiles/vorpal_engine.dir/src/main.cpp.obj: /home/user/Documents/VorpalEngine/src/main.cpp
+CMakeFiles/vorpal_engine.dir/src/main.cpp.obj: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/vorpal_engine.dir/src/main.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/main.cpp.obj -MF CMakeFiles/vorpal_engine.dir/src/main.cpp.obj.d -o CMakeFiles/vorpal_engine.dir/src/main.cpp.obj -c /home/user/Documents/VorpalEngine/src/main.cpp
 
-CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.i"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/user/Documents/VorpalEngine/src/Platform/Platform.c > CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.i
+CMakeFiles/vorpal_engine.dir/src/main.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/vorpal_engine.dir/src/main.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/Documents/VorpalEngine/src/main.cpp > CMakeFiles/vorpal_engine.dir/src/main.cpp.i
 
-CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.s"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/user/Documents/VorpalEngine/src/Platform/Platform.c -o CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.s
+CMakeFiles/vorpal_engine.dir/src/main.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/vorpal_engine.dir/src/main.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/Documents/VorpalEngine/src/main.cpp -o CMakeFiles/vorpal_engine.dir/src/main.cpp.s
 
-CMakeFiles/vorpal_engine.dir/src/main.c.o: CMakeFiles/vorpal_engine.dir/flags.make
-CMakeFiles/vorpal_engine.dir/src/main.c.o: /home/user/Documents/VorpalEngine/src/main.c
-CMakeFiles/vorpal_engine.dir/src/main.c.o: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object CMakeFiles/vorpal_engine.dir/src/main.c.o"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/main.c.o -MF CMakeFiles/vorpal_engine.dir/src/main.c.o.d -o CMakeFiles/vorpal_engine.dir/src/main.c.o -c /home/user/Documents/VorpalEngine/src/main.c
-
-CMakeFiles/vorpal_engine.dir/src/main.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/vorpal_engine.dir/src/main.c.i"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/user/Documents/VorpalEngine/src/main.c > CMakeFiles/vorpal_engine.dir/src/main.c.i
-
-CMakeFiles/vorpal_engine.dir/src/main.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/vorpal_engine.dir/src/main.c.s"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/user/Documents/VorpalEngine/src/main.c -o CMakeFiles/vorpal_engine.dir/src/main.c.s
-
-CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o: CMakeFiles/vorpal_engine.dir/flags.make
-CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o: /home/user/Documents/VorpalEngine/src/external/volk/volk.c
-CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o -MF CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o.d -o CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o -c /home/user/Documents/VorpalEngine/src/external/volk/volk.c
+CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj: CMakeFiles/vorpal_engine.dir/flags.make
+CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj: CMakeFiles/vorpal_engine.dir/includes_C.rsp
+CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj: /home/user/Documents/VorpalEngine/src/external/volk/volk.c
+CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj: CMakeFiles/vorpal_engine.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj"
+	/usr/bin/x86_64-w64-mingw32-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj -MF CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj.d -o CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj -c /home/user/Documents/VorpalEngine/src/external/volk/volk.c
 
 CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.i"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/user/Documents/VorpalEngine/src/external/volk/volk.c > CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.i
+	/usr/bin/x86_64-w64-mingw32-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/user/Documents/VorpalEngine/src/external/volk/volk.c > CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.i
 
 CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.s"
-	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/user/Documents/VorpalEngine/src/external/volk/volk.c -o CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.s
+	/usr/bin/x86_64-w64-mingw32-gcc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/user/Documents/VorpalEngine/src/external/volk/volk.c -o CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.s
 
 # Object files for target vorpal_engine
 vorpal_engine_OBJECTS = \
-"CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o" \
-"CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o" \
-"CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o" \
-"CMakeFiles/vorpal_engine.dir/src/main.c.o" \
-"CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o"
+"CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj" \
+"CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj" \
+"CMakeFiles/vorpal_engine.dir/src/main.cpp.obj" \
+"CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj"
 
 # External object files for target vorpal_engine
 vorpal_engine_EXTERNAL_OBJECTS =
 
-vorpal_engine: CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o
-vorpal_engine: CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o
-vorpal_engine: CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o
-vorpal_engine: CMakeFiles/vorpal_engine.dir/src/main.c.o
-vorpal_engine: CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o
-vorpal_engine: CMakeFiles/vorpal_engine.dir/build.make
-vorpal_engine: src/external/glfw/src/libglfw3.a
-vorpal_engine: /usr/lib64/librt.a
-vorpal_engine: /usr/lib64/libm.so
-vorpal_engine: CMakeFiles/vorpal_engine.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking C executable vorpal_engine"
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/src/main.cpp.obj
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/build.make
+vorpal_engine.exe: src/external/glfw/src/libglfw3dll.a
+vorpal_engine.exe: src/external/glm/glm/libglm.dll.a
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/linkLibs.rsp
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/objects1.rsp
+vorpal_engine.exe: CMakeFiles/vorpal_engine.dir/link.txt
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/user/Documents/VorpalEngine/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CXX executable vorpal_engine.exe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/vorpal_engine.dir/link.txt --verbose=$(VERBOSE)
+	/usr/bin/cmake -E copy /home/user/Documents/VorpalEngine/build/src/external/glfw/src/glfw3.dll /home/user/Documents/VorpalEngine/build/glfw3.dll
 
 # Rule to build all files generated by this target.
-CMakeFiles/vorpal_engine.dir/build: vorpal_engine
+CMakeFiles/vorpal_engine.dir/build: vorpal_engine.exe
 .PHONY : CMakeFiles/vorpal_engine.dir/build
 
 CMakeFiles/vorpal_engine.dir/clean:

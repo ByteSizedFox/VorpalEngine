@@ -8,11 +8,10 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/user/Documents/VorpalEngine/src/Engine/Engine.c" "CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o" "gcc" "CMakeFiles/vorpal_engine.dir/src/Engine/Engine.c.o.d"
-  "/home/user/Documents/VorpalEngine/src/Engine/VulkanUtils.c" "CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o" "gcc" "CMakeFiles/vorpal_engine.dir/src/Engine/VulkanUtils.c.o.d"
-  "/home/user/Documents/VorpalEngine/src/Platform/Platform.c" "CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o" "gcc" "CMakeFiles/vorpal_engine.dir/src/Platform/Platform.c.o.d"
-  "/home/user/Documents/VorpalEngine/src/external/volk/volk.c" "CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o" "gcc" "CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.o.d"
-  "/home/user/Documents/VorpalEngine/src/main.c" "CMakeFiles/vorpal_engine.dir/src/main.c.o" "gcc" "CMakeFiles/vorpal_engine.dir/src/main.c.o.d"
+  "/home/user/Documents/VorpalEngine/src/external/volk/volk.c" "CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj" "gcc" "CMakeFiles/vorpal_engine.dir/src/external/volk/volk.c.obj.d"
+  "/home/user/Documents/VorpalEngine/src/Engine/Window.cpp" "CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj" "gcc" "CMakeFiles/vorpal_engine.dir/src/Engine/Window.cpp.obj.d"
+  "/home/user/Documents/VorpalEngine/src/Platform/Platform.cpp" "CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj" "gcc" "CMakeFiles/vorpal_engine.dir/src/Platform/Platform.cpp.obj.d"
+  "/home/user/Documents/VorpalEngine/src/main.cpp" "CMakeFiles/vorpal_engine.dir/src/main.cpp.obj" "gcc" "CMakeFiles/vorpal_engine.dir/src/main.cpp.obj.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

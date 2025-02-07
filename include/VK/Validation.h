@@ -1,10 +1,12 @@
+#pragma once
+
 #include <vector>
 #include "config.h"
 
 #include <volk.h>
 #include <GLFW/glfw3.h>
 
-const std::vector<const char*> validationLayers = {
+const static std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
