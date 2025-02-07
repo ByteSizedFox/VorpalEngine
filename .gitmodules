@@ -1,0 +1,9 @@
+[submodule "src/external/Vulkan-Headers"]
+	path = src/external/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers
+[submodule "src/external/glfw"]
+	path = src/external/glfw
+	url = https://github.com/glfw/glfw
+[submodule "src/external/volk"]
+	path = src/external/volk
+	url = https://github.com/zeux/volk
