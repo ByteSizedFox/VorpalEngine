@@ -30,6 +30,10 @@
 #include <set>
 #include <unordered_map>
 
+#ifdef _WIN32
+#define NDEBUG
+#endif
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -256,8 +260,20 @@ private:
         createSyncObjects();
     }
 
+    double last_time = 0;
+    int frames = 0;
+    int fps = 0;
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
+            double now = glfwGetTime();
+            frames++;
+
+            if (now - last_time >= 1.0) {
+                fps = frames;
+                frames = 0;
+                last_time = now;
+            }
+            printf("FPS: %i\n", fps);
             glfwPollEvents();
             drawFrame();
         }

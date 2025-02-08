@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/glm.dir/objects.a
+/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/glm.dir/objects.a @CMakeFiles/glm.dir/objects1.rsp
+/usr/bin/x86_64-w64-mingw32-g++ -fstack-protector -lssp -shared -o libglm.dll -Wl,--out-implib,libglm.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles/glm.dir/objects.a -Wl,--no-whole-archive @CMakeFiles/glm.dir/linkLibs.rsp

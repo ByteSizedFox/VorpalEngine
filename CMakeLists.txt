@@ -9,7 +9,6 @@ add_executable(vorpal_engine ${SRC_FILES} external/volk/volk.c)
 add_subdirectory(external/Vulkan-Headers)
 add_subdirectory(external/glfw)
 add_subdirectory(external/glm)
-add_subdirectory(external/volk)
 
 target_include_directories (vorpal_engine PUBLIC
     external/Vulkan-Headers/include
@@ -27,6 +26,6 @@ if (WIN32)
     target_link_options(vorpal_engine PRIVATE -static)
     add_custom_command(TARGET vorpal_engine POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_BINARY_DIR}/src/external/glfw/src/glfw3.dll
+            ${CMAKE_CURRENT_BINARY_DIR}/external/glfw/src/glfw3.dll
             ${CMAKE_CURRENT_BINARY_DIR}/glfw3.dll)
 endif()

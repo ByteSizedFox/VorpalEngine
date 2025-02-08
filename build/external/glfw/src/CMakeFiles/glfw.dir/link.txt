@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/glfw.dir/objects.a
+/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/glfw.dir/objects.a @CMakeFiles/glfw.dir/objects1.rsp
+/usr/bin/x86_64-w64-mingw32-gcc -fstack-protector -lssp -shared -o glfw3.dll -Wl,--out-implib,libglfw3dll.a -Wl,--major-image-version,3,--minor-image-version,5 -Wl,--whole-archive CMakeFiles/glfw.dir/objects.a -Wl,--no-whole-archive @CMakeFiles/glfw.dir/linkLibs.rsp
