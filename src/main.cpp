@@ -1,7 +1,3 @@
-#include <volk.h>
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
@@ -30,6 +26,7 @@
 #include "Engine/Engine.hpp"
 #include "Engine/Vertex.hpp"
 #include "Engine/Mesh3D.hpp"
+#include "Engine/Window.hpp"
 
 #ifdef _WIN32
 #define NDEBUG
@@ -46,7 +43,6 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
-
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
@@ -88,17 +84,17 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-class HelloTriangleApplication {
+class Application {
 public:
     void run() {
-        initWindow();
+        window.init(800, 600);
         initVulkan();
         mainLoop();
         cleanup();
     }
 
 private:
-    GLFWwindow* window;
+    Window window;
 
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -138,32 +134,13 @@ private:
     VkImageView textureImageView1;
 
     VkSampler textureSampler;
-
     VkDescriptorPool descriptorPool;
 
     std::vector<VkCommandBuffer> commandBuffers;
-
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
-
-    bool framebufferResized = false;
-
-    void initWindow() {
-        glfwInit();
-
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
-        glfwSetWindowUserPointer(window, this);
-        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-    }
-
-    static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
-        app->framebufferResized = true;
-    }
 
     Mesh3D mesh;
     Mesh3D mesh1;
@@ -208,7 +185,7 @@ private:
     int frames = 0;
     int fps = 0;
     void mainLoop() {
-        while (!glfwWindowShouldClose(window)) {
+        while (!window.ShouldClose()) {
             double now = glfwGetTime();
             frames++;
 
@@ -285,15 +262,15 @@ private:
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
 
-        glfwDestroyWindow(window);
+        window.destroy();
         glfwTerminate();
     }
 
     void recreateSwapChain() {
         int width = 0, height = 0;
-        glfwGetFramebufferSize(window, &width, &height);
+        window.GetFramebufferSize(&width, &height);
         while (width == 0 || height == 0) {
-            glfwGetFramebufferSize(window, &width, &height);
+            window.GetFramebufferSize(&width, &height);
             glfwWaitEvents();
         }
 
@@ -368,7 +345,7 @@ private:
     }
 
     void createSurface() {
-        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+        if (glfwCreateWindowSurface(instance, window.get(), nullptr, &surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
     }
@@ -1208,14 +1185,6 @@ private:
             mesh1.updateUniformBuffer(swapChainExtent, currentFrame, 2);
             mesh1.draw(commandBuffer, pipelineLayout, currentFrame);
 
-            // VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
-            // VkDeviceSize offsets[] = {0};
-            // vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
-            // vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-            // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-            // vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh.m_indices.size()), 1, 0, 0, 0);
-
         vkCmdEndRenderPass(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -1257,8 +1226,6 @@ private:
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        //updateUniformBuffer(currentFrame, 0);
-
         vkResetFences(VK::device, 1, &inFlightFences[currentFrame]);
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
@@ -1297,8 +1264,8 @@ private:
 
         result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-            framebufferResized = false;
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.framebufferResized) {
+            window.framebufferResized = false;
             recreateSwapChain();
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
@@ -1337,7 +1304,6 @@ private:
                 return availablePresentMode;
             }
         }
-
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
@@ -1346,7 +1312,7 @@ private:
             return capabilities.currentExtent;
         } else {
             int width, height;
-            glfwGetFramebufferSize(window, &width, &height);
+            window.GetFramebufferSize(&width, &height);
 
             VkExtent2D actualExtent = {
                 static_cast<uint32_t>(width),
@@ -1515,7 +1481,7 @@ private:
 };
 
 int main() {
-    HelloTriangleApplication app;
+    Application app;
 
     try {
         app.run();
