@@ -11,15 +11,31 @@ public:
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
+    std::vector<VkDescriptorSet> descriptorSets;
+
+    // uniforms are WIP
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
+
+    // constants
+    const int MAX_FRAMES_IN_FLIGHT = 2;
+
     Mesh3D() {
 
     }
 
-    void init();
+    void init(const char *modelName);
     void destroy();
     void createVertexBuffer();
     void createIndexBuffer();
     void loadModel(const char* filename);
+    
 
-    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, std::vector<VkDescriptorSet> descriptorSets, uint32_t currentFrame);
+    // wip
+    void createUniformBuffers();
+    void createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkImageView textureImageView, VkSampler textureSampler);
+    void updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
+
+    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t currentFrame);
 };

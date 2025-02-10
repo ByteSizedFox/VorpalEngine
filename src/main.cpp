@@ -88,12 +88,6 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct UniformBufferObject {
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-};
-
 class HelloTriangleApplication {
 public:
     void run() {
@@ -138,14 +132,14 @@ private:
     VkImage textureImage;
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
+    
+    VkImage textureImage1;
+    VkDeviceMemory textureImageMemory1;
+    VkImageView textureImageView1;
+
     VkSampler textureSampler;
 
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void*> uniformBuffersMapped;
-
     VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
 
     std::vector<VkCommandBuffer> commandBuffers;
 
@@ -191,22 +185,23 @@ private:
         createColorResources();
         createDepthResources();
         createFramebuffers();
-        createTextureImage();
+
+        createTextureImage("textures/citizen_sheet_baseColor.png");
+        createTextureImage1("textures/texture.jpg");
+
         createTextureImageView();
+        createTextureImageView1();
+
         createTextureSampler();
-
-        mesh.loadModel("models/viking_room.obj");
-        mesh.init();
-
-        mesh1.loadModel("models/cube.obj");
-        mesh1.init();
-        
-
-        createUniformBuffers();
         createDescriptorPool();
-        createDescriptorSets();
+
         createCommandBuffers();
         createSyncObjects();
+
+        mesh.init("models/viking_room1.obj");
+        mesh1.init("models/cube.obj");
+        mesh.createDescriptorSets(descriptorSetLayout, descriptorPool, textureImageView, textureSampler);
+        mesh1.createDescriptorSets(descriptorSetLayout, descriptorPool, textureImageView1, textureSampler);
     }
 
     double last_time = 0;
@@ -257,31 +252,22 @@ private:
         vkDestroyPipelineLayout(VK::device, pipelineLayout, nullptr);
         vkDestroyRenderPass(VK::device, renderPass, nullptr);
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
-            vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
-        }
+        mesh.destroy();
+        mesh1.destroy();
 
         vkDestroyDescriptorPool(VK::device, descriptorPool, nullptr);
 
         vkDestroySampler(VK::device, textureSampler, nullptr);
         vkDestroyImageView(VK::device, textureImageView, nullptr);
-
         vkDestroyImage(VK::device, textureImage, nullptr);
         vkFreeMemory(VK::device, textureImageMemory, nullptr);
 
+        // tmp
+        vkDestroyImageView(VK::device, textureImageView1, nullptr);
+        vkDestroyImage(VK::device, textureImage1, nullptr);
+        vkFreeMemory(VK::device, textureImageMemory1, nullptr);
+
         vkDestroyDescriptorSetLayout(VK::device, descriptorSetLayout, nullptr);
-
-        vkDestroyBuffer(VK::device, mesh.indexBuffer, nullptr);
-        vkFreeMemory(VK::device, mesh.indexBufferMemory, nullptr);
-        vkDestroyBuffer(VK::device, mesh.vertexBuffer, nullptr);
-        vkFreeMemory(VK::device, mesh.vertexBufferMemory, nullptr);
-
-        // temporary
-        vkDestroyBuffer(VK::device, mesh1.indexBuffer, nullptr);
-        vkFreeMemory(VK::device, mesh1.indexBufferMemory, nullptr);
-        vkDestroyBuffer(VK::device, mesh1.vertexBuffer, nullptr);
-        vkFreeMemory(VK::device, mesh1.vertexBufferMemory, nullptr);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(VK::device, renderFinishedSemaphores[i], nullptr);
@@ -290,7 +276,6 @@ private:
         }
 
         vkDestroyCommandPool(VK::device, VK::commandPool, nullptr);
-
         vkDestroyDevice(VK::device, nullptr);
 
         if (enableValidationLayers) {
@@ -301,7 +286,6 @@ private:
         vkDestroyInstance(instance, nullptr);
 
         glfwDestroyWindow(window);
-
         glfwTerminate();
     }
 
@@ -818,14 +802,14 @@ private:
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
 
-    void createTextureImage() {
+    void createTextureImage(const char *path) {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load(path, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
         mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
         if (!pixels) {
-            printf("Filename: %s\n", TEXTURE_PATH.c_str());
+            printf("Filename: %s\n", path);
             throw std::runtime_error("failed to load texture image!");
         }
 
@@ -850,6 +834,39 @@ private:
         vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
 
         generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
+    }
+    void createTextureImage1(const char *path) {
+        int texWidth, texHeight, texChannels;
+        stbi_uc* pixels = stbi_load(path, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+
+        if (!pixels) {
+            printf("Filename: %s\n", path);
+            throw std::runtime_error("failed to load texture image1!");
+        }
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        Engine::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(VK::device, stagingBufferMemory, 0, imageSize, 0, &data);
+            memcpy(data, pixels, static_cast<size_t>(imageSize));
+        vkUnmapMemory(VK::device, stagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage1, textureImageMemory1);
+
+        transitionImageLayout(textureImage1, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+        copyBufferToImage(stagingBuffer, textureImage1, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+        //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
+
+        vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
+        vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
+
+        generateMipmaps(textureImage1, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
     }
 
     void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
@@ -956,6 +973,9 @@ private:
 
     void createTextureImageView() {
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+    }
+    void createTextureImageView1() {
+        textureImageView1 = createImageView(textureImage1, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
     }
 
     void createTextureSampler() {
@@ -1110,81 +1130,21 @@ private:
         Engine::endSingleTimeCommands(commandBuffer);
     }
 
-    void createUniformBuffers() {
-        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
-        uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            Engine::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-
-            vkMapMemory(VK::device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
-        }
-    }
-
     void createDescriptorPool() {
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-        poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolInfo.pPoolSizes = poolSizes.data(); 
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 3);
 
         if (vkCreateDescriptorPool(VK::device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
-        }
-    }
-
-    void createDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        allocInfo.pSetLayouts = layouts.data();
-
-        descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        if (vkAllocateDescriptorSets(VK::device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate descriptor sets!");
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(UniformBufferObject);
-
-            VkDescriptorImageInfo imageInfo{};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureImageView;
-            imageInfo.sampler = textureSampler;
-
-            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = descriptorSets[i];
-            descriptorWrites[0].dstBinding = 0;
-            descriptorWrites[0].dstArrayElement = 0;
-            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = descriptorSets[i];
-            descriptorWrites[1].dstBinding = 1;
-            descriptorWrites[1].dstArrayElement = 0;
-            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrites[1].descriptorCount = 1;
-            descriptorWrites[1].pImageInfo = &imageInfo;
-
-            vkUpdateDescriptorSets(VK::device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
     }
 
@@ -1242,11 +1202,11 @@ private:
             scissor.extent = swapChainExtent;
             vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-            updateUniformBuffer(currentFrame, 0);
-            mesh.draw(commandBuffer, pipelineLayout, descriptorSets, currentFrame);
+            mesh.updateUniformBuffer(swapChainExtent, currentFrame, 0);
+            mesh.draw(commandBuffer, pipelineLayout, currentFrame);
 
-            updateUniformBuffer(currentFrame, 1);
-            mesh1.draw(commandBuffer, pipelineLayout, descriptorSets, currentFrame);
+            mesh1.updateUniformBuffer(swapChainExtent, currentFrame, 2);
+            mesh1.draw(commandBuffer, pipelineLayout, currentFrame);
 
             // VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
             // VkDeviceSize offsets[] = {0};
@@ -1282,23 +1242,6 @@ private:
                 throw std::runtime_error("failed to create synchronization objects for a frame!");
             }
         }
-    }
-
-    void updateUniformBuffer(uint32_t currentImage, int index) {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.model = glm::translate(ubo.model, glm::vec3(index, 0,0)); // translate by index
-
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
-        ubo.proj[1][1] *= -1;
-
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     void drawFrame() {

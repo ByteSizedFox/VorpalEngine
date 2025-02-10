@@ -57,3 +57,13 @@ namespace std {
         }
     };
 }
+
+struct UniformBufferObject {
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
+};
+// wip
+struct UniformBufferObjectB {
+    alignas(16) glm::mat4 model;
+};
