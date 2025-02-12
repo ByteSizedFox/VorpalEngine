@@ -1,3 +1,0 @@
-/usr/bin/cmake -E rm -f CMakeFiles/vorpal_engine.dir/objects.a
-/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/vorpal_engine.dir/objects.a @CMakeFiles/vorpal_engine.dir/objects1.rsp
-/usr/bin/x86_64-w64-mingw32-g++ -fstack-protector -lssp -static -Wl,--whole-archive CMakeFiles/vorpal_engine.dir/objects.a -Wl,--no-whole-archive -o vorpal_engine.exe -Wl,--out-implib,libvorpal_engine.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/vorpal_engine.dir/linkLibs.rsp

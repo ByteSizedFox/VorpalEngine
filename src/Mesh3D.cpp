@@ -1,6 +1,7 @@
 #include "Engine/Mesh3D.hpp"
 #include "Engine/Engine.hpp"
 #include "Engine/Vertex.hpp"
+#include "config.h"
 
 #include <string.h>
 #include <unordered_map>
@@ -21,7 +22,11 @@ void Mesh3D::destroy() {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
         vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
+
+        vkDestroyBuffer(VK::device, modelBuffers[i], nullptr);
+        vkFreeMemory(VK::device, modelBuffersMemory[i], nullptr);
     }
+
     vkDestroyBuffer(VK::device, indexBuffer, nullptr);
     vkFreeMemory(VK::device, indexBufferMemory, nullptr);
     vkDestroyBuffer(VK::device, vertexBuffer, nullptr);
@@ -33,16 +38,16 @@ void Mesh3D::createVertexBuffer() {
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    Engine::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void* data;
     vkMapMemory(VK::device, stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, m_vertices.data(), (size_t) bufferSize);
     vkUnmapMemory(VK::device, stagingBufferMemory);
 
-    Engine::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+    Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 
-    Engine::copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+    Memory::copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
@@ -52,16 +57,16 @@ void Mesh3D::createIndexBuffer() {
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    Engine::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void* data;
     vkMapMemory(VK::device, stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, m_indices.data(), (size_t) bufferSize);
     vkUnmapMemory(VK::device, stagingBufferMemory);
 
-    Engine::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+    Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
 
-    Engine::copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    Memory::copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
@@ -118,14 +123,24 @@ void Mesh3D::loadModel(const char* filename) {
 
 void Mesh3D::createUniformBuffers() {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    VkDeviceSize bufferSizeB = sizeof(ModelBufferObject);
 
     uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
+    // tmp
+    modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    modelBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    modelBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        Engine::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+        Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
         vkMapMemory(VK::device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+
+        // tmp
+        Memory::createBuffer(bufferSizeB, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
+        vkMapMemory(VK::device, modelBuffersMemory[i], 0, bufferSizeB, 0, &modelBuffersMapped[i]);
     }
 }
 
@@ -153,7 +168,12 @@ void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkD
         imageInfo.imageView = textureImageView;
         imageInfo.sampler = textureSampler;
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        VkDescriptorBufferInfo bufferInfoB{};
+        bufferInfoB.buffer = modelBuffers[i];
+        bufferInfoB.offset = 0;
+        bufferInfoB.range = sizeof(ModelBufferObject);
+
+        std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptorSets[i];
@@ -171,25 +191,36 @@ void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkD
         descriptorWrites[1].descriptorCount = 1;
         descriptorWrites[1].pImageInfo = &imageInfo;
 
+        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[2].dstSet = descriptorSets[i];
+        descriptorWrites[2].dstBinding = 2;
+        descriptorWrites[2].dstArrayElement = 0;
+        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[2].descriptorCount = 1;
+        descriptorWrites[2].pBufferInfo = &bufferInfoB;
+
         vkUpdateDescriptorSets(VK::device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
 
 void Mesh3D::updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index) {
+    UniformBufferObject ubo{};
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
+    ubo.proj[1][1] *= -1;
+    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));    
+}
+
+void Mesh3D::updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-    UniformBufferObject ubo{};
+    ModelBufferObject ubo{};
     ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(index, 0,0)); // translate by index
     ubo.model = glm::rotate(ubo.model, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
-    ubo.proj[1][1] *= -1;
-        
-    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     
+    memcpy(modelBuffersMapped[currentImage], &ubo, sizeof(ubo));    
 }

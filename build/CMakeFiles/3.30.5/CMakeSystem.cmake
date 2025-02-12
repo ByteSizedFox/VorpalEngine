@@ -3,12 +3,12 @@ set(CMAKE_HOST_SYSTEM_NAME "Linux")
 set(CMAKE_HOST_SYSTEM_VERSION "6.12.8-200.fc41.x86_64")
 set(CMAKE_HOST_SYSTEM_PROCESSOR "x86_64")
 
-include("/usr/share/mingw/toolchain-mingw64.cmake")
+include("/home/user/Documents/VorpalEngine/mingw.toolchain")
 
 set(CMAKE_SYSTEM "Windows")
 set(CMAKE_SYSTEM_NAME "Windows")
 set(CMAKE_SYSTEM_VERSION "")
-set(CMAKE_SYSTEM_PROCESSOR "x86_64")
+set(CMAKE_SYSTEM_PROCESSOR "")
 
 set(CMAKE_CROSSCOMPILING "TRUE")
 

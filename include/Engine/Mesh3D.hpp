@@ -18,8 +18,9 @@ public:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
-    // constants
-    const int MAX_FRAMES_IN_FLIGHT = 2;
+    std::vector<VkBuffer> modelBuffers;
+    std::vector<VkDeviceMemory> modelBuffersMemory;
+    std::vector<void*> modelBuffersMapped;
 
     Mesh3D() {
 
@@ -36,6 +37,7 @@ public:
     void createUniformBuffers();
     void createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkImageView textureImageView, VkSampler textureSampler);
     void updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
+    void updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
 
     void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t currentFrame);
 };
