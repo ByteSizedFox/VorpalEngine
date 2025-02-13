@@ -74,6 +74,7 @@
         "unordered_set": "cpp",
         "regex": "cpp",
         "future": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "*.inc": "cpp"
     }
 }

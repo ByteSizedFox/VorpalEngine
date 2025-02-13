@@ -1,5 +1,6 @@
 #include <vector>
 #include <Engine/Vertex.hpp>
+#include "Engine/Texture.hpp"
 
 class Mesh3D {
 public:
@@ -18,15 +19,10 @@ public:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
-    std::vector<VkBuffer> modelBuffers;
-    std::vector<VkDeviceMemory> modelBuffersMemory;
-    std::vector<void*> modelBuffersMapped;
-
     Mesh3D() {
-
     }
 
-    void init(const char *modelName);
+    void init(const char *modelName, std::vector<int> textures);
     void destroy();
     void createVertexBuffer();
     void createIndexBuffer();
@@ -35,9 +31,10 @@ public:
 
     // wip
     void createUniformBuffers();
-    void createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkImageView textureImageView, VkSampler textureSampler);
+    void createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool);
     void updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
-    void updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
+    ModelBufferObject updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
+    void createTextureImageView();
 
     void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t currentFrame);
 };

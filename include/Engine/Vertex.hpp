@@ -65,4 +65,5 @@ struct UniformBufferObject {
 // wip
 struct ModelBufferObject {
     alignas(16) glm::mat4 model;
+    alignas(16) int textureID;
 };

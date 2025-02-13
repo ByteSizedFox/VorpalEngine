@@ -11,20 +11,16 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-void Mesh3D::init(const char *modelName) {
+void Mesh3D::init(const char *modelName, std::vector<int> textures) {
     loadModel(modelName);
     createVertexBuffer();
     createIndexBuffer();
-    createUniformBuffers();
 }
 
 void Mesh3D::destroy() {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
         vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
-
-        vkDestroyBuffer(VK::device, modelBuffers[i], nullptr);
-        vkFreeMemory(VK::device, modelBuffersMemory[i], nullptr);
     }
 
     vkDestroyBuffer(VK::device, indexBuffer, nullptr);
@@ -78,7 +74,10 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
     
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+
+    // BAD!
+    //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
+
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 }
 
@@ -123,28 +122,20 @@ void Mesh3D::loadModel(const char* filename) {
 
 void Mesh3D::createUniformBuffers() {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-    VkDeviceSize bufferSizeB = sizeof(ModelBufferObject);
 
     uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
-    // tmp
-    modelBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    modelBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-    modelBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
         vkMapMemory(VK::device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
-
-        // tmp
-        Memory::createBuffer(bufferSizeB, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, modelBuffers[i], modelBuffersMemory[i]);
-        vkMapMemory(VK::device, modelBuffersMemory[i], 0, bufferSizeB, 0, &modelBuffersMapped[i]);
     }
 }
 
-void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkImageView textureImageView, VkSampler textureSampler) {
+extern std::vector<Texture> textures;
+
+void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool) {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -163,17 +154,14 @@ void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkD
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = textureImageView;
-        imageInfo.sampler = textureSampler;
+        std::vector<VkDescriptorImageInfo> imageInfos(textures.size());
+        for (size_t i = 0; i < textures.size(); ++i) {
+            imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos[i].imageView = textures[i].textureImageView;
+            imageInfos[i].sampler = textures[i].textureSampler;
+        }
 
-        VkDescriptorBufferInfo bufferInfoB{};
-        bufferInfoB.buffer = modelBuffers[i];
-        bufferInfoB.offset = 0;
-        bufferInfoB.range = sizeof(ModelBufferObject);
-
-        std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = descriptorSets[i];
@@ -188,16 +176,8 @@ void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkD
         descriptorWrites[1].dstBinding = 1;
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-
-        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2].dstSet = descriptorSets[i];
-        descriptorWrites[2].dstBinding = 2;
-        descriptorWrites[2].dstArrayElement = 0;
-        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[2].descriptorCount = 1;
-        descriptorWrites[2].pBufferInfo = &bufferInfoB;
+        descriptorWrites[1].descriptorCount = imageInfos.size();
+        descriptorWrites[1].pImageInfo = (imageInfos.data());
 
         vkUpdateDescriptorSets(VK::device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
@@ -211,7 +191,7 @@ void Mesh3D::updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentIma
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));    
 }
 
-void Mesh3D::updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index) {
+ModelBufferObject Mesh3D::updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     auto currentTime = std::chrono::high_resolution_clock::now();
@@ -222,5 +202,6 @@ void Mesh3D::updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage
     ubo.model = glm::rotate(ubo.model, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     
-    memcpy(modelBuffersMapped[currentImage], &ubo, sizeof(ubo));    
+    // return the matrix to the GPU via push constants
+    return ubo;
 }
