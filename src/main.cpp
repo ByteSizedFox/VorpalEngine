@@ -24,11 +24,7 @@
 #include "Engine/Vertex.hpp"
 #include "Engine/Mesh3D.hpp"
 #include "Engine/Window.hpp"
-
 #include "VK/Validation.hpp"
-
-// wip loader
-#include "Engine/Loader.hpp"
 
 #ifdef _WIN32
 #define NDEBUG
@@ -81,6 +77,12 @@ private:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
+    // descriptors
+    std::vector<VkDescriptorSet> descriptorSets;
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
+
     Mesh3D mesh;
     Mesh3D mesh1;
 
@@ -104,12 +106,14 @@ private:
         createFramebuffers();
         createCommandBuffers();
 
-        std::vector<const char *> texturePaths = {"textures/citizen_sheet_baseColor.png", "textures/texture.jpg"};
-        textures.resize(texturePaths.size());
-        for (int i = 0; i < texturePaths.size(); i++) {
+        mesh.init("assets/models/male_07.gltf", {0} );
+        mesh1.init("assets/models/cube.obj", {1} );
+
+        textures.resize(VK::g_texturePathList.size());
+        for (int i = 0; i < VK::g_texturePathList.size(); i++) {
             Texture *texture = &textures[i];
             texture->createTextureSampler();
-            texture->createTextureImage(texturePaths[i]);
+            texture->createTextureImage(VK::g_texturePathList[i].c_str());
             texture->createTextureImageView();
         }
 
@@ -120,14 +124,13 @@ private:
         
         createSyncObjects();
 
-        mesh.init("models/viking_room1.obj", {0} );
-        mesh1.init("models/cube.obj", {1} );
+        // post init
         
-        mesh.createUniformBuffers();
-        mesh.createDescriptorSets(descriptorSetLayout, descriptorPool);
+        createUniformBuffers();
+        createDescriptorSets();
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            mesh.updateUniformBuffer(swapChainExtent, i, 0);
+            updateUniformBuffer(i);
         }
     }
 
@@ -182,6 +185,11 @@ private:
 
         mesh.destroy();
         mesh1.destroy();
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
+            vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
+        }
 
         for (int i = 0; i < textures.size(); i++) {
             Texture *texture = &textures[i];
@@ -516,8 +524,8 @@ private:
     }
 
     void createGraphicsPipeline() {
-        auto vertShaderCode = Utils::readFile("shaders/vert.spv");
-        auto fragShaderCode = Utils::readFile("shaders/frag.spv");
+        auto vertShaderCode = Utils::readFileZip("assets/shaders/vert.spv");
+        auto fragShaderCode = Utils::readFileZip("assets/shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -803,8 +811,8 @@ private:
             viewport.minDepth = 0.0f;
             viewport.maxDepth = 1.0f;
 
-        ModelBufferObject model1 = mesh.updateModelBuffer(swapChainExtent, currentFrame, 0);
-        ModelBufferObject model2 = mesh1.updateModelBuffer(swapChainExtent, currentFrame, 2);
+        ModelBufferObject model1 = mesh.getModelMatrix(0);
+        ModelBufferObject model2 = mesh1.getModelMatrix(2);
         
         model1.textureID = 0;
         model2.textureID = 1;
@@ -820,7 +828,7 @@ private:
             vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
             // temporary: use only the first model descriptorsets
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(mesh.descriptorSets)[currentFrame], 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
 
             vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &model1);           
             mesh.draw(commandBuffer, pipelineLayout, currentFrame);
@@ -909,6 +917,9 @@ private:
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.framebufferResized) {
             window.framebufferResized = false;
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                updateUniformBuffer(i);
+            }
             recreateSwapChain();
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
@@ -968,24 +979,85 @@ private:
             return actualExtent;
         }
     }
+
+    // descriptors
+    void createDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+
+        descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(VK::device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = uniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            std::vector<VkDescriptorImageInfo> imageInfos(textures.size());
+            for (size_t i = 0; i < textures.size(); ++i) {
+                imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[i].imageView = textures[i].textureImageView;
+                imageInfos[i].sampler = textures[i].textureSampler;
+            }
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = descriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = descriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorCount = imageInfos.size();
+            descriptorWrites[1].pImageInfo = (imageInfos.data());
+
+            vkUpdateDescriptorSets(VK::device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+    }
+    void createUniformBuffers() {
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+        uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+            vkMapMemory(VK::device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+        }
+    }
+
+    void updateUniformBuffer(uint32_t currentImage) {
+        UniformBufferObject ubo{};
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj[1][1] *= -1;
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));    
+    }
+
 };
+
+extern const char _binary_a_bin_start[];
+extern const char _binary_a_bin_end[];
 
 int main() {
     // test, NOTE: this code loads a model from a zip archive
-    Assimp::Importer importer;
-    std::vector<char> d = Utils::readFile("test.zip");
-    MinizIOSystem* ioSystem = new MinizIOSystem( (uint8_t*) d.data(), d.size() * sizeof(d[0]) );
-    importer.SetIOHandler(ioSystem);
-
-    const aiScene* scene = importer.ReadFile("test.obj", 0);
-    printf("Mesh Count: %i\n", scene->mNumMeshes);
-
-    // wip trying to load individual file
-    Assimp::IOSystem *system = ioSystem;
-    MinizIOStream *stream = (MinizIOStream *)system->Open("test.obj", "r");
-    char buf[100];
-    stream->Read(buf, 2, 1);
-    printf("buffer %s\n", buf);
+    const size_t size = _binary_a_bin_end - _binary_a_bin_start;
+    Utils::initIOSystem(_binary_a_bin_start, size);
 
     Application app;
 

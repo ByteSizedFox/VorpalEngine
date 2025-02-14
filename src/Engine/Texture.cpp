@@ -95,7 +95,10 @@
 
     void Texture::createTextureImage(const char *path) {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load(path, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+        std::vector<char> buffer = Utils::readFileZip(path);
+        stbi_uc* pixels = stbi_load_from_memory((unsigned char*) buffer.data(), buffer.size() * sizeof(char), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
         VkDeviceSize imageSize = texWidth * texHeight * 4;
         mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 

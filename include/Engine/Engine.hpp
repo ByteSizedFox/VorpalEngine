@@ -5,12 +5,15 @@
 #include <fstream>
 #include <vector>
 
+#include <assimp/IOSystem.hpp>
+
 namespace VK {
     inline VkDevice device;
     inline VkPhysicalDevice physicalDevice;
     inline VkCommandPool commandPool;
     inline VkQueue graphicsQueue;
     inline VkSurfaceKHR surface;
+    inline std::vector<std::string> g_texturePathList;
 };
 
 namespace Command {
@@ -99,7 +102,14 @@ namespace Memory {
     }
 };
 
+#include "assimp/Importer.hpp"
+
 namespace Utils {
+    inline Assimp::Importer importer;
+    inline Assimp::IOSystem* ioSystem;
+
+    void initIOSystem(const char * data, size_t size);
+
     inline std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -118,6 +128,8 @@ namespace Utils {
 
         return buffer;
     }
+    std::vector<char> readFileZip(const std::string& filename);
+    bool fileExistsZip(const std::string& filename);
 };
 
 namespace Image {

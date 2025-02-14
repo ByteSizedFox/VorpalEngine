@@ -21,11 +21,20 @@ protected:
     size_t currentPos;
 
     MinizIOStream(const mz_zip_archive* zipArchive, size_t index) : zip(zipArchive), fileIndex(index), currentPos(0) {
+        
         // Extract file data upfront since miniz doesn't support streaming
         mz_zip_archive_file_stat stat;
-        mz_zip_reader_file_stat(const_cast<mz_zip_archive*>(zip), fileIndex, &stat);
+        if (!mz_zip_reader_file_stat(const_cast<mz_zip_archive*>(zip), fileIndex, &stat)) {
+            printf("Error: Failed to get file stats for index %zu\n", index);
+            throw std::runtime_error("Failed to get file stats");
+        }
+
         fileData.resize(stat.m_uncomp_size);
-        mz_zip_reader_extract_to_mem(const_cast<mz_zip_archive*>(zip), fileIndex, fileData.data(), fileData.size(), 0);
+        
+        if (!mz_zip_reader_extract_to_mem(const_cast<mz_zip_archive*>(zip), fileIndex, fileData.data(), fileData.size(), 0)) {
+            printf("Error: Failed to extract file data for index %zu\n", index);
+            throw std::runtime_error("Failed to extract file data");
+        }
     }
 
 public:
@@ -34,6 +43,7 @@ public:
     }
 
     size_t Read(void* pvBuffer, size_t pSize, size_t pCount) override {
+        
         size_t bytesToRead = pSize * pCount;
         size_t bytesAvailable = fileData.size() - currentPos;
         size_t bytesToActuallyRead = std::min(bytesToRead, bytesAvailable);
@@ -83,25 +93,31 @@ private:
     mz_zip_archive zip;
     std::vector<uint8_t> zipBuffer;
 
-    // Helper function to locate file index
     int locateFile(const char* pFile) const {
-        // Need to const_cast because miniz API isn't const-correct
-        return mz_zip_reader_locate_file(const_cast<mz_zip_archive*>(&zip), 
-                                       pFile, 
-                                       nullptr, 
-                                       0);
+        int index = mz_zip_reader_locate_file(const_cast<mz_zip_archive*>(&zip), pFile, nullptr, 0);
+        return index;
     }
 
 public:
     MinizIOSystem(const uint8_t* buffer, size_t bufferSize) {
+        
+        // Check buffer validity
+        if (!buffer) {
+            printf("Error: Null buffer provided\n");
+            throw std::runtime_error("Null buffer provided");
+        }
+
         // Initialize miniz structure
         memset(&zip, 0, sizeof(zip));
         
-        // Copy buffer to ensure it stays valid
+        // Copy buffer
         zipBuffer.assign(buffer, buffer + bufferSize);
 
         // Open the archive from memory
         if (!mz_zip_reader_init_mem(&zip, zipBuffer.data(), zipBuffer.size(), 0)) {
+            mz_zip_error err_code = mz_zip_get_last_error(&zip);
+            printf("Error: Failed to initialize zip archive. Error code: %d\n", (int)err_code);
+            printf("Error description: %s\n", mz_zip_get_error_string(err_code));
             throw std::runtime_error("Failed to initialize zip archive");
         }
     }
@@ -111,7 +127,9 @@ public:
     }
 
     bool Exists(const char* pFile) const override {
-        return locateFile(pFile) >= 0;
+        bool exists = locateFile(pFile) >= 0;
+        printf("File %s Exists: %b\n", pFile, exists);
+        return exists;
     }
 
     char getOsSeparator() const override {
@@ -119,16 +137,24 @@ public:
     }
 
     Assimp::IOStream* Open(const char* pFile, const char* pMode) override {
+        printf("Opening File: %s\n", pFile);
+
         if (strchr(pMode, 'w') != nullptr) {
+            printf("Error: Write mode not supported: %s\n", pFile);
             return nullptr;
         }
 
         int fileIndex = locateFile(pFile);
         if (fileIndex < 0) {
+            printf("Error: File not found: %s\n", pFile);
             return nullptr;
         }
-
-        return new MinizIOStream(&zip, fileIndex);
+        try {
+            return new MinizIOStream(&zip, fileIndex);
+        } catch (const std::exception& e) {
+            printf("Error: Failed to create IOStream: %s\n", e.what());
+            return nullptr;
+        }
     }
 
     void Close(Assimp::IOStream* pFile) override {

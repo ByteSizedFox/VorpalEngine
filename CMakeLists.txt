@@ -1,10 +1,65 @@
 cmake_minimum_required(VERSION 3.6)
 project(vorpal_engine)
 
+# static windows linking
+if (WIN32)
+ser(CMAKE_CXX_FLAGS, -ffat-lto-objects -flto -static)
+endif()
+
 file(GLOB SRC_FILES src/*.cpp src/Engine/*.cpp src/Platform/*.cpp src/external/imgui/*.cpp)
 
-# Set the build type to Release for optimizations
-# set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+# First, gather all files while preserving relative paths from the assets directory
+file(GLOB_RECURSE ASSET_FILES 
+    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/*"
+)
+
+# Create a clean directory for staging
+file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/assets")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/assets")
+
+# Copy files to staging with clean paths
+foreach(ASSET ${ASSET_FILES})
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/${ASSET}"
+        "${CMAKE_CURRENT_BINARY_DIR}/assets/${ASSET}"
+        COPYONLY
+    )
+endforeach()
+
+# Create the zip archive from the staged directory
+file(ARCHIVE_CREATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
+    PATHS "${CMAKE_CURRENT_BINARY_DIR}/assets"
+    FORMAT zip
+    VERBOSE
+)
+
+# Copy to a simple name in the binary dir
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/a.bin"
+    COMMAND ${CMAKE_COMMAND} -E copy 
+        "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
+        "${CMAKE_CURRENT_BINARY_DIR}/a.bin"
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
+    COMMENT "Copying to simple filename"
+    VERBATIM
+)
+
+# Use llvm-objcopy to convert the zip to an object file
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/assets.o"
+    COMMAND cd "${CMAKE_CURRENT_BINARY_DIR}" && ${CMAKE_OBJCOPY} 
+        -I binary
+        -O elf64-x86-64
+        -B i386:x86-64
+        a.bin 
+        assets.o
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/a.bin"
+    COMMENT "Converting assets.zip to object file"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    VERBATIM
+)
+
 
 # Apply global compiler flags to all targets
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
@@ -17,7 +72,7 @@ elseif(MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /GL")
 endif()
 
-add_executable(vorpal_engine ${SRC_FILES} external/volk/volk.c)
+add_executable(vorpal_engine ${SRC_FILES} external/volk/volk.c ${CMAKE_CURRENT_BINARY_DIR}/assets.o)
 
 # libraries
 add_subdirectory(external/Vulkan-Headers)
@@ -41,8 +96,4 @@ target_include_directories(vorpal_engine PRIVATE include)
 # windows, copy dlls to target
 if (WIN32)
     target_link_options(vorpal_engine PRIVATE -static)
-    add_custom_command(TARGET vorpal_engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_BINARY_DIR}/external/glfw/src/glfw3.dll
-            ${CMAKE_CURRENT_BINARY_DIR}/glfw3.dll)
 endif()

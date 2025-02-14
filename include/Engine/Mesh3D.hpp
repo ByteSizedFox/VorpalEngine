@@ -12,14 +12,8 @@ public:
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
-    std::vector<VkDescriptorSet> descriptorSets;
-
-    // uniforms are WIP
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void*> uniformBuffersMapped;
-
     Mesh3D() {
+
     }
 
     void init(const char *modelName, std::vector<int> textures);
@@ -27,14 +21,7 @@ public:
     void createVertexBuffer();
     void createIndexBuffer();
     void loadModel(const char* filename);
-    
 
-    // wip
-    void createUniformBuffers();
-    void createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool);
-    void updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
-    ModelBufferObject updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index);
-    void createTextureImageView();
-
+    ModelBufferObject getModelMatrix(int index);
     void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t currentFrame);
 };

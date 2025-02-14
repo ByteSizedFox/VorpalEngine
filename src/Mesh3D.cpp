@@ -18,11 +18,6 @@ void Mesh3D::init(const char *modelName, std::vector<int> textures) {
 }
 
 void Mesh3D::destroy() {
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
-        vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
-    }
-
     vkDestroyBuffer(VK::device, indexBuffer, nullptr);
     vkFreeMemory(VK::device, indexBufferMemory, nullptr);
     vkDestroyBuffer(VK::device, vertexBuffer, nullptr);
@@ -81,117 +76,108 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 }
 
-void Mesh3D::loadModel(const char* filename) {
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string warn, err;
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <unordered_map>
+#include <vector>
+#include <stdexcept>
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename)) {
-        throw std::runtime_error(warn + err);
+void Mesh3D::loadModel(const char* filename) {
+    // Import the model with postprocessing steps to ensure triangulation and texture coordinates
+    const aiScene* scene = Utils::importer.ReadFile(filename, aiProcess_Triangulate);
+
+    // Check if the import was successful
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+        throw std::runtime_error("Assimp error: " + std::string(Utils::importer.GetErrorString()));
     }
 
     std::unordered_map<Vertex, uint32_t> uniqueVertices {};
 
-    for (const auto& shape : shapes) {
-        for (const auto& index : shape.mesh.indices) {
-            Vertex vertex{};
-
-            vertex.pos = {
-                attrib.vertices[3 * index.vertex_index + 0],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
-            };
-
-            vertex.texCoord = {
-                attrib.texcoords[2 * index.texcoord_index + 0],
-                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-            };
-
-            vertex.color = {1.0f, 1.0f, 1.0f};
-
-            if (uniqueVertices.count(vertex) == 0) {
-                uniqueVertices[vertex] = static_cast<uint32_t>(m_vertices.size());
-                m_vertices.push_back(vertex);
+    // Process each mesh in the scene
+    for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
+        aiMesh* mesh = scene->mMeshes[i];
+        
+        // Get material for this mesh
+        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        
+        // Get diffuse texture path
+        aiString texturePath;
+        int textureID = 0; // Default to 0 if no texture
+        
+        if (material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == AI_SUCCESS) {
+            std::string texPath = std::string("assets/textures/") + std::string(texturePath.C_Str());
+            printf("Texture Path: %s\n", texPath.c_str());
+            
+            // Check if texture path already exists in our global list
+            auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
+            
+            if (it != VK::g_texturePathList.end()) {
+                // Texture already exists, get its index
+                textureID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
+            } else {
+                // Check if file exists before adding                
+                bool exists = Utils::fileExistsZip(texPath);
+                if (exists) {
+                    // Add new texture path and get its index
+                    textureID = static_cast<int>(VK::g_texturePathList.size());
+                    VK::g_texturePathList.push_back(texPath);
+                }
             }
-
-            m_indices.push_back(uniqueVertices[vertex]);
+            printf("Texture ID: %i\n", textureID);
         }
-    }
-}
 
-void Mesh3D::createUniformBuffers() {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+        // Process each face (triangle) in the mesh
+        for (unsigned int j = 0; j < mesh->mNumFaces; j++) {
+            aiFace& face = mesh->mFaces[j];
 
-    uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-    uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+            // Process each index in the face
+            for (unsigned int k = 0; k < face.mNumIndices; k++) {
+                uint32_t index = face.mIndices[k];
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-        vkMapMemory(VK::device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+                // Create a new vertex structure
+                Vertex vertex{};
+
+                // Position (AI_DEFAULT) assumes a 3D vector format.
+                vertex.pos = {
+                    mesh->mVertices[index].x,
+                    mesh->mVertices[index].y,
+                    mesh->mVertices[index].z
+                };
+
+                // Texture coordinates (may be missing, but we check if valid)
+                if (mesh->mTextureCoords[0]) {
+                    vertex.texCoord = {
+                        mesh->mTextureCoords[0][index].x,
+                        1.0f - mesh->mTextureCoords[0][index].y // Manually flip the Y-coordinate
+                    };
+                } else {
+                    vertex.texCoord = {0.0f, 0.0f}; // Default to (0, 0) if no texture coords
+                }
+
+                // Default color (white), as per original code
+                vertex.color = {1.0f, 1.0f, 1.0f};
+                
+                // Store the texture ID
+                vertex.textureID = textureID;
+                //printf("Texture ID: %i\n", textureID);
+
+                // If this vertex is not already in the unique list, add it
+                if (uniqueVertices.count(vertex) == 0) {
+                    uniqueVertices[vertex] = static_cast<uint32_t>(m_vertices.size());
+                    m_vertices.push_back(vertex);
+                }
+
+                // Add index to the indices list
+                m_indices.push_back(uniqueVertices[vertex]);
+            }
+        }
     }
 }
 
 extern std::vector<Texture> textures;
 
-void Mesh3D::createDescriptorSets(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool) {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    allocInfo.pSetLayouts = layouts.data();
-
-    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(VK::device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
-
-        std::vector<VkDescriptorImageInfo> imageInfos(textures.size());
-        for (size_t i = 0; i < textures.size(); ++i) {
-            imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfos[i].imageView = textures[i].textureImageView;
-            imageInfos[i].sampler = textures[i].textureSampler;
-        }
-
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptorSets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = imageInfos.size();
-        descriptorWrites[1].pImageInfo = (imageInfos.data());
-
-        vkUpdateDescriptorSets(VK::device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-    }
-}
-
-void Mesh3D::updateUniformBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index) {
-    UniformBufferObject ubo{};
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
-    ubo.proj[1][1] *= -1;
-    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));    
-}
-
-ModelBufferObject Mesh3D::updateModelBuffer(VkExtent2D swapChainExtent, uint32_t currentImage, int index) {
+ModelBufferObject Mesh3D::getModelMatrix(int index) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     auto currentTime = std::chrono::high_resolution_clock::now();

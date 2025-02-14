@@ -75,6 +75,7 @@
         "regex": "cpp",
         "future": "cpp",
         "mutex": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "typeindex": "cpp"
     }
 }
