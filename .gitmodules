@@ -61,3 +61,6 @@
 [submodule "external/libzip"]
 	path = external/libzip
 	url = https://github.com/nih-at/libzip
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui
