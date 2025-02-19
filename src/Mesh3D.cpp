@@ -70,9 +70,6 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    // BAD!
-    //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
-
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 }
 
@@ -85,7 +82,7 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 
 void Mesh3D::loadModel(const char* filename) {
     // Import the model with postprocessing steps to ensure triangulation and texture coordinates
-    const aiScene* scene = Utils::importer.ReadFile(filename, aiProcess_Triangulate);
+    const aiScene* scene = Utils::importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_PreTransformVertices);
 
     // Check if the import was successful
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -185,8 +182,10 @@ ModelBufferObject Mesh3D::getModelMatrix(int index) {
 
     ModelBufferObject ubo{};
     ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(index, 0,0)); // translate by index
-    ubo.model = glm::rotate(ubo.model, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    ubo.model = glm::scale(ubo.model, glm::vec3(0.1, 0.1, 0.1));
+
+    //ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    //ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     
     // return the matrix to the GPU via push constants
     return ubo;

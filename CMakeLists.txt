@@ -72,7 +72,21 @@ elseif(MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /GL")
 endif()
 
-add_executable(vorpal_engine ${SRC_FILES} external/volk/volk.c ${CMAKE_CURRENT_BINARY_DIR}/assets.o)
+add_executable(vorpal_engine
+    ${SRC_FILES}
+    ${CMAKE_CURRENT_BINARY_DIR}/assets.o
+    # volk
+    external/volk/volk.c
+    
+    # imgui
+    external/imgui/imgui.cpp
+    external/imgui/imgui_draw.cpp
+    external/imgui/imgui_demo.cpp
+    external/imgui/imgui_tables.cpp
+    external/imgui/imgui_widgets.cpp
+    external/imgui/backends/imgui_impl_glfw.cpp
+    external/imgui/backends/imgui_impl_vulkan.cpp
+)
 
 # libraries
 add_subdirectory(external/Vulkan-Headers)
@@ -88,7 +102,9 @@ target_include_directories (vorpal_engine PUBLIC
     external/volk/
     external/assimp/include
     external/assimp/contrib/zip/src
+    external/imgui
 )
+target_compile_definitions(vorpal_engine PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK=1)
 
 target_link_libraries(vorpal_engine glfw glm assimp)
 target_include_directories(vorpal_engine PRIVATE include)
