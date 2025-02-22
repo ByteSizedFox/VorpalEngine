@@ -1301,6 +1301,7 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         glm::mat4 rot = glm::mat4(1.0);
         
+        
         rot = glm::rotate(rot, camRot.y, glm::vec3(1.0,0.0,0.0));
         rot = glm::rotate(rot, camRot.x, glm::vec3(0.0,1.0,0.0));
         const glm::mat4 inverted = glm::inverse(rot);
