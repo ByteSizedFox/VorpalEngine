@@ -60,7 +60,6 @@ add_custom_command(
     VERBATIM
 )
 
-
 # Apply global compiler flags to all targets
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
     # For GCC/Clang, set optimization flags globally

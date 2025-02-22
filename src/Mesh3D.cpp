@@ -64,7 +64,7 @@ void Mesh3D::createIndexBuffer() {
 }
 
 void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t currentFrame) {
-    VkBuffer vertexBuffers[] = {vertexBuffer};
+    VkBuffer vertexBuffers[] = { vertexBuffer };
     VkDeviceSize offsets[] = {0};
     
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
@@ -181,12 +181,9 @@ ModelBufferObject Mesh3D::getModelMatrix(int index) {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     ModelBufferObject ubo{};
-    ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(index, 0,0)); // translate by index
-    ubo.model = glm::scale(ubo.model, glm::vec3(0.1, 0.1, 0.1));
+    ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.01));
+    ubo.model = glm::translate(ubo.model, glm::vec3(index, 0,0)); // translate by index
 
-    //ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    //ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    
     // return the matrix to the GPU via push constants
     return ubo;
 }

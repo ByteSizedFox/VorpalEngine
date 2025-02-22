@@ -16,7 +16,8 @@ const std::vector<const char*> validationLayers = {
 std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     //VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME,
-    //VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+    //VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
 };
 
 static inline std::vector<const char*> getRequiredExtensions() {

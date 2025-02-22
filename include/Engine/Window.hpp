@@ -23,5 +23,5 @@ public:
     glm::vec2 last_mouse_pos;
     int last_focus = 0;
     bool first_mouse;
-    
+    bool key_pressed[1024];
 };

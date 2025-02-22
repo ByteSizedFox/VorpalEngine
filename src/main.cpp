@@ -308,7 +308,7 @@ private:
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Vorpal Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_API_VERSION_1_2;
 
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -998,7 +998,8 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     void drawUI() {
         ImGui::SetNextWindowSize(ImVec2(200, 80));
-        ImGui::Begin("Stats");
+
+        ImGui::Begin("Stats", NULL, ImGuiWindowFlags_NoResize);
         ImGui::Text("FPS: %i", fps);
         ImGui::Text("Press Escape To Exit");
         ImGui::End();
@@ -1293,6 +1294,48 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
 
     glm::vec2 camRot = glm::vec3(0.0,0.0,0.0);
+    glm::vec3 camPos = glm::vec3(0.0,0.0,0.0);
+
+    void handle_input() {
+        glm::vec2 mouseVec = window.getMouseVector();
+
+        glm::mat4 rot = glm::mat4(1.0);
+        
+        rot = glm::rotate(rot, camRot.y, glm::vec3(1.0,0.0,0.0));
+        rot = glm::rotate(rot, camRot.x, glm::vec3(0.0,1.0,0.0));
+        const glm::mat4 inverted = glm::inverse(rot);
+        const glm::vec3 forward = glm::normalize(glm::vec3(inverted[2]));
+
+        float speed = 0.001f;
+
+        if (window.key_pressed[GLFW_KEY_LEFT_SHIFT]) {
+            speed *= 2;
+        }
+
+        if (window.key_pressed[GLFW_KEY_W]) {
+            camPos += forward * glm::vec3(speed);
+        }
+        if (window.key_pressed[GLFW_KEY_S]) {
+            camPos -= forward * glm::vec3(speed);
+        }
+        if (window.key_pressed[GLFW_KEY_A]) {
+            camPos -= glm::cross(forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
+        }
+        if (window.key_pressed[GLFW_KEY_D]) {
+            camPos += glm::cross(forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
+        }
+
+        // up
+        if (window.key_pressed[GLFW_KEY_SPACE]) {
+            camPos.y -= speed;
+        }
+        if (window.key_pressed[GLFW_KEY_LEFT_CONTROL]) {
+            camPos.y += speed;
+        }
+
+        camRot += mouseVec * glm::vec2(-0.01f, 0.01f);
+        camRot.y = glm::clamp(camRot.y, glm::radians(-75.0f), glm::radians(75.0f));
+    }
 
     void updateUniformBuffer(uint32_t currentImage) {
         static auto startTime = std::chrono::high_resolution_clock::now();
@@ -1303,18 +1346,14 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         UniformBufferObject ubo{};
         ubo.view = glm::rotate(glm::mat4(1.0f), time * glm::radians(10.0f), glm::vec3(0.0, 1.0, 0.0));// glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-        glm::vec2 mouseVec = window.getMouseVector();
-
-        camRot += mouseVec * glm::vec2(-0.01f, 0.01f);
+        handle_input();
 
         glm::mat4 cameraMatrix = glm::mat4(1.0);
-
         cameraMatrix = glm::rotate(cameraMatrix, camRot.y, glm::vec3(1.0,0.0,0.0));
         cameraMatrix = glm::rotate(cameraMatrix, camRot.x, glm::vec3(0.0,1.0,0.0));
-
-        ubo.view = glm::translate(cameraMatrix, glm::vec3(0.0, -0.1, -0.2));
+        ubo.view = glm::translate(cameraMatrix, camPos);
         
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.001f, 10.0f);
         ubo.proj[1][1] *= -1;
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));    
     }

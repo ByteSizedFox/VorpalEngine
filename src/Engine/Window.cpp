@@ -14,7 +14,7 @@ void Window::init(int WIDTH, int HEIGHT) {
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
-    
+
     // mouse and kb capture
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetKeyCallback(window, key_callback);
@@ -61,8 +61,8 @@ void Window::key_callback(GLFWwindow* window, int key, int scancode, int action,
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
-    //auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-    //if (action == GLFW_PRESS ||action == GLFW_RELEASE) {
-    //    app->pressed_keys[key] = (action == GLFW_PRESS);
-    //}
+    auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (action == GLFW_PRESS ||action == GLFW_RELEASE) {
+        app->key_pressed[key] = (action == GLFW_PRESS);
+    }
 }
