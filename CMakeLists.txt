@@ -3,7 +3,7 @@ project(vorpal_engine)
 
 # static windows linking
 if (WIN32)
-ser(CMAKE_CXX_FLAGS, -ffat-lto-objects -flto -static)
+set(CMAKE_CXX_FLAGS, -ffat-lto-objects -flto -static)
 endif()
 
 file(GLOB SRC_FILES src/*.cpp src/Engine/*.cpp src/Platform/*.cpp src/external/imgui/*.cpp)

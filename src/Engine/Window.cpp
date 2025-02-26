@@ -1,9 +1,15 @@
-#include "Engine/Window.hpp"
+#include "Window.hpp"
+
+#include "glm/gtc/matrix_transform.hpp"
+
+#include <stdio.h>
 
 void Window::framebufferResizeCallback(GLFWwindow* window, int width, int height) {
     auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
 }
+
+#include <cstring>
 
 void Window::init(int WIDTH, int HEIGHT) {
     glfwInit();
@@ -14,10 +20,28 @@ void Window::init(int WIDTH, int HEIGHT) {
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetMouseButtonCallback(window, MouseButtonCallback);
+
+    // DO NOT CHANGE, this fixes a conflict with the two renderpasses, only change if you're fixing the issue
+    glfwSetWindowSizeLimits(window, 200, 400, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    
+    // mouse and kb capture
+    glfwSetWindowFocusCallback(window, [](GLFWwindow* window, int focused) {
+        if (focused) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        } else {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_FALSE);
+        }
+    });
+
+    // update initial projection matrix
+    projectionMatrix = glm::perspective(glm::radians(45.0f), (float) WIDTH / (float) HEIGHT, 0.001f, 10.0f);
 
     // mouse and kb capture
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetKeyCallback(window, key_callback);
+    memset(key_pressed, false, 1024);
 }
 bool Window::ShouldClose() {
     return glfwWindowShouldClose(window);
@@ -28,6 +52,7 @@ void Window::destroy() {
 void Window::GetFramebufferSize(int *width, int *height) {
     glfwGetFramebufferSize(window, width, height);
 }
+
 void Window::cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 
@@ -44,15 +69,33 @@ void Window::cursor_position_callback(GLFWwindow* window, double xpos, double yp
     }
 
     app->mouse_pos = {xpos, ypos};
+
+    // handle user input
+    glm::vec2 camRot = app->camera.getRotation();
+    glm::vec2 lastMousePos = app->last_mouse_pos;
+    glm::vec2 mouseVec = app->getMouseVector();
+    camRot += (mouseVec * glm::vec2(-0.005f, 0.005f));
+    camRot.y = glm::clamp(camRot.y, glm::radians(-75.0f), glm::radians(75.0f));
+    app->camera.setRotation(camRot);
 }
+
 glm::vec2 Window::getMouseVector() {
     if (first_mouse) {
         return {0.0f, 0.0f};
     }
-
+    
     float xoffset = last_mouse_pos.x - mouse_pos.x;
     float yoffset = last_mouse_pos.y - mouse_pos.y; // Reversed since y-coordinates range from bottom to top
-    last_mouse_pos = mouse_pos;
+
+    if (key_pressed[GLFW_KEY_F]) { // smoothing test
+        last_mouse_pos = (mouse_pos + last_mouse_pos) / glm::vec2(2.0f);
+    } else {
+        last_mouse_pos = mouse_pos;
+    }
+
+    printf("MouseVec: %f %f\n", xoffset, -yoffset);
+
+    last_mouseVec = {xoffset, yoffset};
 
     return {xoffset, -yoffset};
 }
@@ -65,4 +108,14 @@ void Window::key_callback(GLFWwindow* window, int key, int scancode, int action,
     if (action == GLFW_PRESS ||action == GLFW_RELEASE) {
         app->key_pressed[key] = (action == GLFW_PRESS);
     }
+}
+
+#include "imgui.h"
+#include <stdio.h>
+
+void Window::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (button >= 0 && button < ImGuiMouseButton_COUNT)
+        printf("Button Event: %i -> %i\n", button, action);
+        io.AddMouseButtonEvent(button, action == GLFW_PRESS);
 }

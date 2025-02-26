@@ -1,3 +1,0 @@
-/usr/bin/cmake -E rm -f CMakeFiles/unit.dir/objects.a
-/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/unit.dir/objects.a @CMakeFiles/unit.dir/objects1.rsp
-/usr/bin/x86_64-w64-mingw32-g++ -fvisibility=hidden -fno-strict-aliasing -Wno-dangling-reference -Wall -Wno-long-long -Wa,-mbig-obj -O3 -std=gnu++17 -ffat-lto-objects -flto -static -O3 -flto -march=native -Wl,--whole-archive CMakeFiles/unit.dir/objects.a -Wl,--no-whole-archive -o ../bin/unit.exe -Wl,--out-implib,../lib/libunit.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/unit.dir/linkLibs.rsp

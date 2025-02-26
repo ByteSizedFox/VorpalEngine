@@ -11,7 +11,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-void Mesh3D::init(const char *modelName, std::vector<int> textures) {
+void Mesh3D::init(const char *modelName) {
     loadModel(modelName);
     createVertexBuffer();
     createIndexBuffer();
@@ -63,13 +63,17 @@ void Mesh3D::createIndexBuffer() {
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
 }
 
-void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, uint32_t currentFrame) {
+void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
+    // update mesh push constants
+    updatePushConstants(commandBuffer, pipelineLayout);
+
+    // bind buffers for model
     VkBuffer vertexBuffers[] = { vertexBuffer };
-    VkDeviceSize offsets[] = {0};
-    
+    VkDeviceSize offsets[] = {0};    
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
+    // draw
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 }
 
@@ -82,7 +86,8 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 
 void Mesh3D::loadModel(const char* filename) {
     // Import the model with postprocessing steps to ensure triangulation and texture coordinates
-    const aiScene* scene = Utils::importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_PreTransformVertices);
+    const aiScene* scene = Utils::importer.ReadFile(filename, aiProcess_Triangulate);
+    aiMatrix4x4 rootMat = scene->mRootNode->mTransformation;
 
     // Check if the import was successful
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -97,14 +102,26 @@ void Mesh3D::loadModel(const char* filename) {
         
         // Get material for this mesh
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-        
+
+        bool hasBones = mesh->HasBones();
+        aiBone **bones = mesh->mBones;
+
+        for (int j = 0; j < mesh->mNumBones; j++) {
+            if (bones[j]->mName.C_Str()[0] != 'D') {
+                continue; // skip bones that do basically nothing
+            }
+            printf("MeshID %i, Bone #%i, name: %s, weights: %i\n", i, j, bones[j]->mName.C_Str(), bones[j]->mNumWeights);
+        }
+
         // Get diffuse texture path
         aiString texturePath;
-        int textureID = 0; // Default to 0 if no texture
+        int textureID = 3; // Default to 0 if no texture
         
-        if (material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == AI_SUCCESS) {
+        aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
+
+        if (ret == AI_SUCCESS) {
             std::string texPath = std::string("assets/textures/") + std::string(texturePath.C_Str());
-            printf("Texture Path: %s\n", texPath.c_str());
+            //printf("Texture Path: %s\n", texPath.c_str());
             
             // Check if texture path already exists in our global list
             auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
@@ -121,7 +138,9 @@ void Mesh3D::loadModel(const char* filename) {
                     VK::g_texturePathList.push_back(texPath);
                 }
             }
-            printf("Texture ID: %i\n", textureID);
+            //printf("Texture ID: %i\n", textureID);
+        } else {
+            //printf("Texture: %s does not exist\n", texturePath.C_Str());
         }
 
         // Process each face (triangle) in the mesh
@@ -135,19 +154,22 @@ void Mesh3D::loadModel(const char* filename) {
                 // Create a new vertex structure
                 Vertex vertex{};
 
+                aiVector3D vec = rootMat * mesh->mVertices[index];
+
                 // Position (AI_DEFAULT) assumes a 3D vector format.
                 vertex.pos = {
-                    mesh->mVertices[index].x,
-                    mesh->mVertices[index].y,
-                    mesh->mVertices[index].z
-                };
+                    vec.x,
+                    vec.y,
+                    vec.z
+                };                
 
                 // Texture coordinates (may be missing, but we check if valid)
-                if (mesh->mTextureCoords[0]) {
+                if (mesh->mTextureCoords[0] && j != -1) {
                     vertex.texCoord = {
                         mesh->mTextureCoords[0][index].x,
                         1.0f - mesh->mTextureCoords[0][index].y // Manually flip the Y-coordinate
                     };
+                    //printf("Texcoord #%i: %f %f\n", index, vertex.texCoord.x, vertex.texCoord.y);
                 } else {
                     vertex.texCoord = {0.0f, 0.0f}; // Default to (0, 0) if no texture coords
                 }
@@ -170,20 +192,33 @@ void Mesh3D::loadModel(const char* filename) {
             }
         }
     }
+    updateModelMatrix();
 }
 
 extern std::vector<Texture> textures;
 
-ModelBufferObject Mesh3D::getModelMatrix(int index) {
-    static auto startTime = std::chrono::high_resolution_clock::now();
+void Mesh3D::updateModelMatrix() {
+    glm::mat4 matrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.01));
+    matrix = glm::translate(matrix, position); // translate by index
+    matrix = glm::rotate(matrix, rotation.x, glm::vec3(1.0,0.0,0.0));
+    matrix = glm::rotate(matrix, rotation.y, glm::vec3(0.0,1.0,0.0));
+    matrix = glm::rotate(matrix, rotation.z, glm::vec3(0.0,0.0,1.0));
+    modelMatrix = matrix;
+}
 
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
+ModelBufferObject Mesh3D::getModelMatrix() {
+    if (isDirty) {
+        updateModelMatrix();
+        isDirty = false;
+    }
     ModelBufferObject ubo{};
-    ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.01));
-    ubo.model = glm::translate(ubo.model, glm::vec3(index, 0,0)); // translate by index
-
+    ubo.model = modelMatrix;
+    ubo.isUI = isUI;
     // return the matrix to the GPU via push constants
     return ubo;
+}
+
+void Mesh3D::updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
+    ModelBufferObject buffer = getModelMatrix();
+    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &buffer);
 }

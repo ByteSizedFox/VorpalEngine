@@ -1,1 +1,0 @@
- external/glfw/src/libglfw3.a external/glm/glm/libglm.a external/assimp/lib/libassimp.a external/assimp/contrib/zlib/libzlibstatic.a -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lwinpthread -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 

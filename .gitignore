@@ -33,5 +33,6 @@
 
 # output
 out
+build
 
 CMakePresets.json

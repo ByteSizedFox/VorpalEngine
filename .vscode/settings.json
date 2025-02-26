@@ -76,6 +76,8 @@
         "future": "cpp",
         "mutex": "cpp",
         "*.inc": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "complex": "cpp",
+        "valarray": "cpp"
     }
 }

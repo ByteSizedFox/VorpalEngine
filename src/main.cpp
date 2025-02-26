@@ -3,6 +3,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/hash.hpp>
 
 #include <iostream>
@@ -24,14 +25,16 @@
 #include "Engine/Vertex.hpp"
 #include "Engine/Mesh3D.hpp"
 #include "Engine/Window.hpp"
+#include "Engine/Camera.hpp"
 #include "VK/Validation.hpp"
 
 // imgui
 #include "imgui.h"
 #include "backends/imgui_impl_vulkan.h"
-#include "backends/imgui_impl_glfw.h"
 
 #include <thread>
+
+#include <array>
 
 #ifdef _WIN32
 #define NDEBUG
@@ -65,15 +68,17 @@ private:
     std::vector<VkFramebuffer> swapChainFramebuffers;
 
     VkRenderPass renderPass;
+    VkRenderPass uiRenderPass;
+
     VkDescriptorSetLayout descriptorSetLayout;
 
     // wip dual pipeline
     VkPipelineLayout pipelineLayout;
-    VkPipelineLayout pipelineLayoutB;
+    VkPipelineLayout uiPipelineLayout;
+
 
     // WIP dual pipeline
     VkPipeline pipeline3D;
-    VkPipeline pipeline2D;
 
     VkImage colorImage;
     VkDeviceMemory colorImageMemory;
@@ -99,15 +104,7 @@ private:
 
     Mesh3D mesh;
     Mesh3D mesh1;
-
-    static void check_vk_result(VkResult err)
-{
-    if (err == VK_SUCCESS)
-        return;
-    fprintf(stderr, "[vulkan] Error: VkResult = %d\n", err);
-    if (err < 0)
-        abort();
-}
+    Mesh3D uiMesh;
 
     void initImGui() {
 
@@ -116,13 +113,12 @@ private:
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
 
-        ImGui_ImplGlfw_InitForVulkan(window.get(), true);
         ImGui_ImplVulkan_InitInfo init_info = {};
         init_info.Instance = instance;
         init_info.PhysicalDevice = VK::physicalDevice;
         init_info.Device = VK::device;
         init_info.QueueFamily = findQueueFamilies(VK::physicalDevice).graphicsFamily.value();
-        init_info.RenderPass = renderPass;
+        init_info.RenderPass = uiRenderPass;
         init_info.Queue = VK::graphicsQueue;
         init_info.PipelineCache = VK_NULL_HANDLE;
         init_info.DescriptorPool = descriptorPool;
@@ -136,6 +132,11 @@ private:
         VkCommandBuffer commandBuffer = Command::beginSingleTimeCommands();
         ImGui_ImplVulkan_CreateFontsTexture();
         Command::endSingleTimeCommands(commandBuffer);
+
+
+        // disable config file
+        io.IniFilename = NULL;
+        io.LogFilename = NULL;
     }
 
 
@@ -148,17 +149,19 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
-        createRenderPass();
 
-        
+        renderPass = createRenderPass(false);
+        uiRenderPass = createRenderPass(true);
+
         createCommandPool();
         createColorResources();
         createDepthResources();
         createFramebuffers();
         createCommandBuffers();
 
-        mesh.init("assets/models/male_07.gltf", {0} );
-        mesh1.init("assets/models/flatgrass.gltf", {1} );
+        mesh.init("assets/models/male_07.gltf");
+        mesh1.init("assets/models/flatgrass.gltf");
+        uiMesh.init("assets/models/Cube.gltf");
 
         textures.resize(VK::g_texturePathList.size());
         for (int i = 0; i < VK::g_texturePathList.size(); i++) {
@@ -168,14 +171,15 @@ private:
             texture->createTextureImageView();
         }
 
-        createDescriptorSetLayout();
+        descriptorSetLayout = createDescriptorSetLayout(false);
 
-        pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv", false);
-        pipeline2D = createGraphicsPipeline2D("assets/shaders/vert2D.spv", "assets/shaders/frag.spv", true);
+        pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv");
 
         createDescriptorPool();        
         createSyncObjects();
         createUniformBuffers();
+
+        setupUI(); // create UI textures before descriptorsets
         createDescriptorSets();
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -192,15 +196,18 @@ private:
             double now = glfwGetTime();
             frames++;
 
+            glfwPollEvents();
+            drawFrame();
+
             if (now - last_time >= 1.0) {
                 fps = frames;
                 frames = 0;
                 last_time = now;
-                //printf("FPS: %i\n", fps);
+                printf("FPS: %i\n", fps);
+                uiNeedsUpdate = true;
             }
 
-            glfwPollEvents();
-            drawFrame();
+            
         }
 
         vkDeviceWaitIdle(VK::device);
@@ -218,7 +225,6 @@ private:
         for (auto framebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(VK::device, framebuffer, nullptr);
         }
-
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(VK::device, imageView, nullptr);
         }
@@ -229,20 +235,25 @@ private:
     void cleanup() {
         // cleanup imgui
         ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
+        //ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         
         cleanupSwapChain();
 
+        vkDestroyImageView(VK::device, uiTextureView, nullptr);
+        vkDestroyImage(VK::device, uiTexture, nullptr);
+        vkDestroyFramebuffer(VK::device, uiFramebuffer, nullptr);
+        vkFreeMemory(VK::device, uiTextureMemory, nullptr);
+
         vkDestroyPipeline(VK::device, pipeline3D, nullptr);
-        vkDestroyPipeline(VK::device, pipeline2D, nullptr);
         
         vkDestroyPipelineLayout(VK::device, pipelineLayout, nullptr);
-        vkDestroyPipelineLayout(VK::device, pipelineLayoutB, nullptr);
         vkDestroyRenderPass(VK::device, renderPass, nullptr);
+        vkDestroyRenderPass(VK::device, uiRenderPass, nullptr);
 
         mesh.destroy();
         mesh1.destroy();
+        uiMesh.destroy();
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
@@ -295,6 +306,15 @@ private:
         createColorResources();
         createDepthResources();
         createFramebuffers();
+
+        // recreate UI framebuffer
+        vkDestroyImageView(VK::device, uiTextureView, nullptr);
+        vkDestroyImage(VK::device, uiTexture, nullptr);
+        vkDestroyFramebuffer(VK::device, uiFramebuffer, nullptr);
+        vkFreeMemory(VK::device, uiTextureMemory, nullptr);
+        
+        setupUI();
+        uiNeedsUpdate = true;
     }
 
     void createInstance() {
@@ -308,7 +328,7 @@ private:
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "Vorpal Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
+        appInfo.apiVersion = VK_API_VERSION_1_2;
 
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -396,6 +416,12 @@ private:
 
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
+
+        VkPhysicalDeviceVulkan12Features features {};
+        //memset(&features, false, sizeof(VkPhysicalDeviceVulkan12Features));
+        //features.pNext = nullptr;
+        //features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        //features.runtimeDescriptorArray = true;
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -492,8 +518,10 @@ private:
             swapChainImageViews[i] = Image::createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         }
     }
+    
+    VkRenderPass createRenderPass(bool isUI) {
+        VkRenderPass resultPass;
 
-    void createRenderPass() {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapChainImageFormat;
         colorAttachment.samples = msaaSamples;
@@ -505,7 +533,7 @@ private:
         colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkAttachmentDescription depthAttachment{};
-        depthAttachment.format = findDepthFormat();
+        depthAttachment.format = Utils::findDepthFormat();
         depthAttachment.samples = msaaSamples;
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -523,6 +551,7 @@ private:
         colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        
 
         VkAttachmentReference colorAttachmentRef{};
         colorAttachmentRef.attachment = 0;
@@ -536,11 +565,17 @@ private:
         colorAttachmentResolveRef.attachment = 2;
         colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+        if (isUI) {
+            colorAttachmentResolveRef.attachment = 1;
+        }
+
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
-        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+        if (!isUI) {
+            subpass.pDepthStencilAttachment = &depthAttachmentRef;
+        }
         subpass.pResolveAttachments = &colorAttachmentResolveRef;
 
         VkSubpassDependency dependency{};
@@ -551,7 +586,14 @@ private:
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-        std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, colorAttachmentResolve };
+        std::vector<VkAttachmentDescription> attachments;
+        if (isUI) {
+            
+            attachments = { colorAttachment, colorAttachmentResolve };
+        } else {
+            attachments = {colorAttachment, depthAttachment, colorAttachmentResolve };
+        }
+
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -561,12 +603,46 @@ private:
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
 
-        if (vkCreateRenderPass(VK::device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+        if (vkCreateRenderPass(VK::device, &renderPassInfo, nullptr, &resultPass) != VK_SUCCESS) {
             throw std::runtime_error("failed to create render pass!");
+        }
+        return resultPass;
+    }
+
+    // WIP UI
+    VkImage uiTexture;
+    VkDeviceMemory uiTextureMemory;
+    VkImageView uiTextureView;
+    VkFramebuffer uiFramebuffer;
+    bool uiNeedsUpdate = false;
+
+    void setupUI() {
+        
+        Image::createImage(200, 400, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
+        uiTextureView = Image::createImageView(uiTexture, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+        
+        std::array<VkImageView, 2> attachments = {
+            colorImageView,
+            uiTextureView
+        };
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = uiRenderPass;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data();
+        framebufferInfo.width = 200;
+        framebufferInfo.height = 400;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(VK::device, &framebufferInfo, nullptr, &uiFramebuffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create framebuffer!");
         }
     }
 
-    void createDescriptorSetLayout() {
+    VkDescriptorSetLayout createDescriptorSetLayout(bool isUI) {
+        VkDescriptorSetLayout resultLayout;
+
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
@@ -576,7 +652,7 @@ private:
 
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
-        samplerLayoutBinding.descriptorCount = textures.size();
+        samplerLayoutBinding.descriptorCount = 75; //textures.size();
         samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -588,18 +664,35 @@ private:
         samplerBinding.pImmutableSamplers = nullptr;
         samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 3> bindings = {uboLayoutBinding, samplerLayoutBinding, samplerBinding};
+        VkDescriptorSetLayoutBinding uiSamplerBinding{};
+        uiSamplerBinding.binding = 3;
+        uiSamplerBinding.descriptorCount = 1;
+        uiSamplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        uiSamplerBinding.pImmutableSamplers = nullptr;
+        uiSamplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        if (isUI) {
+            samplerBinding.binding = 0;
+            bindings.resize(1);
+            bindings = {samplerBinding};
+        } else {
+            bindings.resize(4);
+            bindings = {uboLayoutBinding, samplerLayoutBinding, samplerBinding, uiSamplerBinding};
+        }
+
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(VK::device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(VK::device, &layoutInfo, nullptr, &resultLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
+        return resultLayout;
     }
     
-    VkPipeline createGraphicsPipeline(const char* vertex_path, const char* fragment_path, bool is2D) {
+    VkPipeline createGraphicsPipeline(const char* vertex_path, const char* fragment_path) {
         VkPipeline result;
 
         auto vertShaderCode = Utils::readFileZip(vertex_path);
@@ -656,6 +749,7 @@ private:
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_FALSE;
+
         multisampling.rasterizationSamples = msaaSamples;
 
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -667,14 +761,14 @@ private:
         depthStencil.stencilTestEnable = VK_FALSE;
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-colorBlendAttachment.blendEnable = VK_TRUE;
-colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_TRUE;
+        colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -699,8 +793,9 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+        
         //setup push constants
 	    VkPushConstantRange push_constant;
 	    push_constant.offset = 0;
@@ -726,8 +821,11 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         pipelineInfo.pDepthStencilState = &depthStencil;
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
+
         pipelineInfo.layout = pipelineLayout;
+
         pipelineInfo.renderPass = renderPass;
+
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
@@ -740,142 +838,7 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         return result;
     }
-    VkPipeline createGraphicsPipeline2D(const char* vertex_path, const char* fragment_path, bool is2D) {
-        VkPipeline result;
-
-        auto vertShaderCode = Utils::readFileZip(vertex_path);
-        auto fragShaderCode = Utils::readFileZip(fragment_path);
-
-        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-
-        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        vertShaderStageInfo.module = vertShaderModule;
-        vertShaderStageInfo.pName = "main";
-
-        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        fragShaderStageInfo.module = fragShaderModule;
-        fragShaderStageInfo.pName = "main";
-
-        VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-        auto bindingDescription = Vertex::getBindingDescription();
-        auto attributeDescriptions = Vertex::getAttributeDescriptions();
-
-        vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-        VkPipelineViewportStateCreateInfo viewportState{};
-        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-        viewportState.viewportCount = 1;
-        viewportState.scissorCount = 1;
-
-        VkPipelineRasterizationStateCreateInfo rasterizer{};
-        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-        rasterizer.depthClampEnable = VK_FALSE;
-        rasterizer.rasterizerDiscardEnable = VK_FALSE;
-        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-        rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        rasterizer.depthBiasEnable = VK_FALSE;
-
-        VkPipelineMultisampleStateCreateInfo multisampling{};
-        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-        multisampling.sampleShadingEnable = VK_FALSE;
-        multisampling.rasterizationSamples = msaaSamples;
-
-        VkPipelineDepthStencilStateCreateInfo depthStencil{};
-        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthStencil.depthTestEnable = VK_FALSE;
-        depthStencil.depthWriteEnable = VK_FALSE;
-        depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
-        depthStencil.depthBoundsTestEnable = VK_FALSE;
-        depthStencil.stencilTestEnable = VK_FALSE;
-
-        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        colorBlendAttachment.blendEnable = VK_FALSE;
-
-        VkPipelineColorBlendStateCreateInfo colorBlending{};
-        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        colorBlending.logicOpEnable = VK_FALSE;
-        colorBlending.logicOp = VK_LOGIC_OP_COPY;
-        colorBlending.attachmentCount = 1;
-        colorBlending.pAttachments = &colorBlendAttachment;
-        colorBlending.blendConstants[0] = 0.0f;
-        colorBlending.blendConstants[1] = 0.0f;
-        colorBlending.blendConstants[2] = 0.0f;
-        colorBlending.blendConstants[3] = 0.0f;
-
-        std::vector<VkDynamicState> dynamicStates = {
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR
-        };
-        VkPipelineDynamicStateCreateInfo dynamicState{};
-        dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-        dynamicState.pDynamicStates = dynamicStates.data();
-
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-
-        //setup push constants
-	    VkPushConstantRange push_constant;
-	    push_constant.offset = 0;
-	    push_constant.size = sizeof(ModelBufferObject);
-	    push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        pipelineLayoutInfo.pPushConstantRanges = &push_constant;
-	    pipelineLayoutInfo.pushConstantRangeCount = 1;
-
-        if (vkCreatePipelineLayout(VK::device, &pipelineLayoutInfo, nullptr, &pipelineLayoutB) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create pipeline layout!");
-        }
-
-        VkGraphicsPipelineCreateInfo pipelineInfo{};
-        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipelineInfo.stageCount = 2;
-        pipelineInfo.pStages = shaderStages;
-        pipelineInfo.pVertexInputState = &vertexInputInfo;
-        pipelineInfo.pInputAssemblyState = &inputAssembly;
-        pipelineInfo.pViewportState = &viewportState;
-        pipelineInfo.pRasterizationState = &rasterizer;
-        pipelineInfo.pMultisampleState = &multisampling;
-        pipelineInfo.pDepthStencilState = &depthStencil;
-        pipelineInfo.pColorBlendState = &colorBlending;
-        pipelineInfo.pDynamicState = &dynamicState;
-        pipelineInfo.layout = pipelineLayoutB;
-        pipelineInfo.renderPass = renderPass;
-        pipelineInfo.subpass = 0;
-        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-        if (vkCreateGraphicsPipelines(VK::device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &result) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create graphics pipeline!");
-        }
-
-        vkDestroyShaderModule(VK::device, fragShaderModule, nullptr);
-        vkDestroyShaderModule(VK::device, vertShaderModule, nullptr);
-
-        return result;
-    }
-
+    
     void createFramebuffers() {
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -916,43 +879,15 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     void createColorResources() {
         VkFormat colorFormat = swapChainImageFormat;
-
         Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
         colorImageView = Image::createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
 
     void createDepthResources() {
-        VkFormat depthFormat = findDepthFormat();
+        VkFormat depthFormat = Utils::findDepthFormat();
 
         Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
         depthImageView = Image::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
-    }
-
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
-        for (VkFormat format : candidates) {
-            VkFormatProperties props;
-            vkGetPhysicalDeviceFormatProperties(VK::physicalDevice, format, &props);
-
-            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
-                return format;
-            } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
-                return format;
-            }
-        }
-
-        throw std::runtime_error("failed to find supported format!");
-    }
-
-    VkFormat findDepthFormat() {
-        return findSupportedFormat(
-            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-        );
-    }
-
-    bool hasStencilComponent(VkFormat format) {
-        return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
 
     VkSampleCountFlagBits getMaxUsableSampleCount() {
@@ -971,7 +906,7 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
 
     void createDescriptorPool() {
-        std::array<VkDescriptorPoolSize, 3> poolSizes{};
+        std::array<VkDescriptorPoolSize, 4> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -979,6 +914,9 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
         poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        poolSizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        poolSizes[3].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1006,13 +944,18 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         }
     }
 
+    bool window_open = true;
     void drawUI() {
-        ImGui::SetNextWindowSize(ImVec2(200, 80));
-
-        ImGui::Begin("Stats", NULL, ImGuiWindowFlags_NoResize);
-        ImGui::Text("FPS: %i", fps);
-        ImGui::Text("Press Escape To Exit");
-        ImGui::End();
+        ImGui::SetNextWindowSize(ImVec2(200, 400));
+        ImGui::SetNextWindowPos(ImVec2(0,0));
+        
+        if (window_open) {
+            ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+            ImGui::Text("FPS: %i", fps);
+            ImGui::Text("Press Escape To Exit");
+            ImGui::Button("Press Me!");
+            ImGui::End();
+        }
     }
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
@@ -1025,11 +968,6 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         }
 
         VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = swapChainExtent;
 
         std::array<VkClearValue, 2> clearValues{};
         clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -1037,10 +975,25 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
+        
+        VkViewport viewport{};
+        VkRect2D scissor{};
 
+        // update the gui when fps changes
+        if (uiNeedsUpdate && window_open) {
+            updateDescriptorSets(currentFrame);
+        }
+        
+
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass;
+        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = swapChainExtent;
+
+        // 3d renderpass
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-            VkViewport viewport{};
                 viewport.x = 0.0f;
                 viewport.y = 0.0f;
                 viewport.width = (float) swapChainExtent.width;
@@ -1049,51 +1002,76 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
                 viewport.maxDepth = 1.0f;
             vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-            VkRect2D scissor{};
             scissor.offset = {0, 0};
             scissor.extent = swapChainExtent;
             vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline3D);
-
-            ModelBufferObject model1 = mesh.getModelMatrix(0);
-            ModelBufferObject model2 = mesh1.getModelMatrix(2);
         
-            model1.textureID = 0;
-            model2.textureID = 1;
-
+            uiMesh.isUI = true;
 
             // temporary: use only the first model descriptorsets
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
 
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &model1);           
-                mesh.draw(commandBuffer, pipelineLayout, currentFrame);
+            //uiMesh.position.x = camPos.x * -100.0;
+            //uiMesh.rotation.x = glm::radians(-90.0f);
+            //printf("camPos.x: %f\n", uiMesh.position.x);
 
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &model2);
-                mesh1.draw(commandBuffer, pipelineLayout, currentFrame);
+            mesh.draw(commandBuffer, pipelineLayout);
+            mesh1.draw(commandBuffer, pipelineLayout);
+            if (window_open) {
+                uiMesh.draw(commandBuffer, pipelineLayout);
+            }
 
-            //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayoutB, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
-            //vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline2D);
-            // draw UI here
-            //mesh1.draw(commandBuffer, pipelineLayout, currentFrame);
-
-        
-
-            // draw imgui
-            ImGui_ImplVulkan_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-
-            //bool show = true;
-            //ImGui::ShowDemoWindow(&show);
-
-            drawUI();
-
-            ImGui::Render();
-            ImDrawData* drawData = ImGui::GetDrawData();
-            ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+            
 
         vkCmdEndRenderPass(commandBuffer);
+        
+        Image::transitionImageLayout(uiTexture, swapChainImageFormat,
+                        VK_IMAGE_LAYOUT_UNDEFINED,
+                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1); 
+        
+        if (uiNeedsUpdate && window_open) {
+            // ui renderpass
+            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassInfo.renderPass = uiRenderPass;
+            renderPassInfo.framebuffer = uiFramebuffer;
+            renderPassInfo.renderArea.offset = {0, 0};
+            renderPassInfo.renderArea.extent = {200, 400};
+
+            vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+                    viewport.x = 0.0f;
+                    viewport.y = 0.0f;
+                    viewport.width = (float) 200;
+                    viewport.height = (float) 400;
+                    viewport.minDepth = 0.0f;
+                    viewport.maxDepth = 1.0f;
+                vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+                scissor.offset = {0, 0};
+                scissor.extent = {
+                    200,
+                    400
+                };
+                vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+                // draw imgui
+                ImGuiIO& io = ImGui::GetIO();
+                io.DisplaySize = ImVec2(200,400);
+
+                ImGui_ImplVulkan_NewFrame();
+                ImGui::NewFrame();
+
+                drawUI();
+
+                ImGui::Render();
+                ImDrawData* drawData = ImGui::GetDrawData();
+                ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+            vkCmdEndRenderPass(commandBuffer);
+            uiNeedsUpdate = false;
+        }
+        // transition UI framebuffer back
+        Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
@@ -1177,8 +1155,10 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
             updateUniformBuffer(i);
         }
 
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.framebufferResized) {
-            window.framebufferResized = false;
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasResized()) {
+            window.clearResized();
+            window.updateProjectionMatrix(swapChainExtent.width, swapChainExtent.height);
+
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 updateUniformBuffer(i);
             }
@@ -1188,6 +1168,8 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+        
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -1255,24 +1237,32 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         if (vkAllocateDescriptorSets(VK::device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            updateDescriptorSets(i);
+        }
+    }
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    void updateDescriptorSets(int frame) {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];
+            bufferInfo.buffer = uniformBuffers[frame];
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 
-            std::vector<VkDescriptorImageInfo> imageInfos(textures.size());
-            for (size_t i = 0; i < textures.size(); ++i) {
-                imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfos[i].imageView = textures[i].textureImageView;
-                imageInfos[i].sampler = nullptr; //textures[i].textureSampler;
+            std::vector<VkDescriptorImageInfo> imageInfos(75);
+            for (size_t j = 0; j < 75; ++j) {
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                if (j < textures.size()) {
+                    imageInfos[j].imageView = textures[j].textureImageView;
+                } else {
+                    imageInfos[j].imageView = textures[0].textureImageView;
+                }
+                imageInfos[j].sampler = nullptr; //textures[i].textureSampler;
             }
 
-            std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+            std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
 
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = descriptorSets[i];
+            descriptorWrites[0].dstSet = descriptorSets[frame];
             descriptorWrites[0].dstBinding = 0;
             descriptorWrites[0].dstArrayElement = 0;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1280,7 +1270,7 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
             descriptorWrites[0].pBufferInfo = &bufferInfo;
 
             descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = descriptorSets[i];
+            descriptorWrites[1].dstSet = descriptorSets[frame];
             descriptorWrites[1].dstBinding = 1;
             descriptorWrites[1].dstArrayElement = 0;
             descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -1291,15 +1281,27 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
         	samplerInfo.sampler = textures[0].textureSampler;
 
             descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[2].dstSet = descriptorSets[i];
+            descriptorWrites[2].dstSet = descriptorSets[frame];
             descriptorWrites[2].dstBinding = 2;
             descriptorWrites[2].dstArrayElement = 0;
             descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
             descriptorWrites[2].descriptorCount = 1;
             descriptorWrites[2].pImageInfo = &samplerInfo;
 
+            VkDescriptorImageInfo uiImageInfo{};
+            uiImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            uiImageInfo.imageView = uiTextureView;
+            uiImageInfo.sampler = nullptr;
+
+            descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[3].dstSet = descriptorSets[frame];
+            descriptorWrites[3].dstBinding = 3;
+            descriptorWrites[3].dstArrayElement = 0;
+            descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            descriptorWrites[3].descriptorCount = 1;
+            descriptorWrites[3].pImageInfo = &uiImageInfo;
+
             vkUpdateDescriptorSets(VK::device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-        }
     }
     void createUniformBuffers() {
         VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -1318,64 +1320,107 @@ colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     glm::vec3 camPos = glm::vec3(0.0,0.0,0.0);
 
     void handle_input() {
-        glm::vec2 mouseVec = window.getMouseVector();
+        glm::vec2 camRot = window.getCamera()->getRotation();
+        glm::vec3 camPos = window.getCamera()->getPosition();
 
-        glm::mat4 rot = glm::mat4(1.0);
-        
-        
-        rot = glm::rotate(rot, camRot.y, glm::vec3(1.0,0.0,0.0));
-        rot = glm::rotate(rot, camRot.x, glm::vec3(0.0,1.0,0.0));
-        const glm::mat4 inverted = glm::inverse(rot);
-        const glm::vec3 forward = glm::normalize(glm::vec3(inverted[2]));
+        //glm::vec2 mouseVec = window.getMouseVector();
+        //camRot += (mouseVec * glm::vec2(-0.001f, 0.001f));
+        //camRot.y = glm::clamp(camRot.y, glm::radians(-75.0f), glm::radians(75.0f));
 
-        float speed = 0.001f;
+        const glm::vec3 forward = window.getCamera()->getForward();
 
-        if (window.key_pressed[GLFW_KEY_LEFT_SHIFT]) {
+        if (window.isKeyPressed(GLFW_KEY_E)) {
+            window_open = true;
+
+            // 1. Position the object in front of the camera
+            float distance = 0.8f;
+
+            uiMesh.setPosition((camPos * glm::vec3(-100.0)) + -forward * distance);
+            uiMesh.updateModelMatrix();
+
+            glm::vec3 objectToCamera = (camPos * glm::vec3(-100.0)) - uiMesh.getPosition();
+            float yaw = std::atan2(objectToCamera.x, objectToCamera.z);
+            float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
+
+            // 4. Set the rotation (assuming your rotation is in radians)
+            uiMesh.setRotation({0.0, yaw, glm::radians(90.0f)});
+        }
+
+        float speed = 0.0005f;
+
+        if (window.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
             speed *= 2;
         }
 
-        if (window.key_pressed[GLFW_KEY_W]) {
+        if (window.isKeyPressed(GLFW_KEY_W)) {
             camPos += forward * glm::vec3(speed);
         }
-        if (window.key_pressed[GLFW_KEY_S]) {
+        if (window.isKeyPressed(GLFW_KEY_S)) {
             camPos -= forward * glm::vec3(speed);
         }
-        if (window.key_pressed[GLFW_KEY_A]) {
+        if (window.isKeyPressed(GLFW_KEY_A)) {
             camPos -= glm::cross(forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
-        if (window.key_pressed[GLFW_KEY_D]) {
+        if (window.isKeyPressed(GLFW_KEY_D)) {
             camPos += glm::cross(forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
 
         // up
-        if (window.key_pressed[GLFW_KEY_SPACE]) {
+        if (window.isKeyPressed(GLFW_KEY_SPACE)) {
             camPos.y -= speed;
         }
-        if (window.key_pressed[GLFW_KEY_LEFT_CONTROL]) {
+        if (window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
             camPos.y += speed;
         }
 
-        camRot += mouseVec * glm::vec2(-0.01f, 0.01f);
-        camRot.y = glm::clamp(camRot.y, glm::radians(-75.0f), glm::radians(75.0f));
+        // apply changes
+        //if (camera.getRotation() != camRot) {
+        //    camera.setRotation(camRot);
+        //}
+        if (window.getCamera()->getPosition() != camPos) {
+            window.getCamera()->setPosition(camPos);
+        }
+        
+        // skip UI stuff if window not open
+        if (!window_open) {
+            return;
+        }
+
+        std::array<glm::vec3, 6> quadVertices;
+        std::array<glm::vec2, 6> quadUVs;
+
+        for (int i = 0; i < 6; i++) {
+            quadVertices[i] = uiMesh.m_vertices[i].pos;
+            quadUVs[i] = uiMesh.m_vertices[i].texCoord;
+        }
+
+        // raycast to 
+        glm::vec2 result;
+        float distance;
+        bool hit = Experiment::raycastRectangle(camPos * glm::vec3(-1.0), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getMatrix(), window.getProjectionMatrix(), distance, result);
+        
+        if (ImGui::GetCurrentContext() == nullptr) {
+            return;
+        }
+        ImGuiIO& io = ImGui::GetIO();
+        if (distance <= 1.0 && hit) {
+            uiNeedsUpdate = true;
+            io.AddMousePosEvent(result.x * 200.0f, result.y * 400.0f);
+        } else {
+            io.AddMousePosEvent(0.0, 0.0);
+        }
+
+        io.MouseDrawCursor = true;
+        
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
         UniformBufferObject ubo{};
-        ubo.view = glm::rotate(glm::mat4(1.0f), time * glm::radians(10.0f), glm::vec3(0.0, 1.0, 0.0));// glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
         handle_input();
 
-        glm::mat4 cameraMatrix = glm::mat4(1.0);
-        cameraMatrix = glm::rotate(cameraMatrix, camRot.y, glm::vec3(1.0,0.0,0.0));
-        cameraMatrix = glm::rotate(cameraMatrix, camRot.x, glm::vec3(0.0,1.0,0.0));
-        ubo.view = glm::translate(cameraMatrix, camPos);
-        
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.001f, 10.0f);
+        ubo.view = window.getCamera()->getMatrix();
+        ubo.proj = window.getProjectionMatrix();
         ubo.proj[1][1] *= -1;
 
         ubo.sampler = textures[0].textureSampler;
