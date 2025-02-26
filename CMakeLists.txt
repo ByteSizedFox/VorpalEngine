@@ -83,7 +83,6 @@ add_executable(vorpal_engine
     external/imgui/imgui_demo.cpp
     external/imgui/imgui_tables.cpp
     external/imgui/imgui_widgets.cpp
-    external/imgui/backends/imgui_impl_glfw.cpp
     external/imgui/backends/imgui_impl_vulkan.cpp
 )
 
