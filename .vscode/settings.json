@@ -78,6 +78,22 @@
         "*.inc": "cpp",
         "typeindex": "cpp",
         "complex": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "barrier": "cpp",
+        "cfenv": "cpp",
+        "coroutine": "cpp",
+        "csetjmp": "cpp",
+        "cuchar": "cpp",
+        "source_location": "cpp",
+        "generator": "cpp",
+        "latch": "cpp",
+        "print": "cpp",
+        "ranges": "cpp",
+        "scoped_allocator": "cpp",
+        "shared_mutex": "cpp",
+        "spanstream": "cpp",
+        "stacktrace": "cpp",
+        "stdfloat": "cpp",
+        "syncstream": "cpp"
     }
 }

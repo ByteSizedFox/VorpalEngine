@@ -5,7 +5,12 @@
 #include <fstream>
 #include <vector>
 
+#include <assimp/IOStream.hpp>
 #include <assimp/IOSystem.hpp>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h> // Output data structure
+#include <assimp/postprocess.h>
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/intersect.hpp>
 #include <glm/glm.hpp>
@@ -14,6 +19,13 @@
 
 #include "config.h"
 
+#include <map>
+
+#include "Engine/Vertex.hpp"
+#include "Texture.hpp"
+
+#include "Engine/Engine.hpp"
+
 namespace VK {
     inline VkDevice device;
     inline VkPhysicalDevice physicalDevice;
@@ -21,6 +33,7 @@ namespace VK {
     inline VkQueue graphicsQueue;
     inline VkSurfaceKHR surface;
     inline std::vector<std::string> g_texturePathList;
+    inline std::unordered_map<std::string, Texture> textureMap;
 };
 
 namespace Command {
@@ -433,5 +446,139 @@ namespace Experiment {
         }
         
         return false;
+    }
+};
+
+namespace Assets {
+    inline void loadModel(const char* filename, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) {
+        // Import the model with postprocessing steps to ensure triangulation and texture coordinates
+        std::vector<char> model = std::move(Utils::readFileZip(filename));
+        const aiScene* scene = Utils::importer.ReadFileFromMemory(model.data(), model.size(), aiProcess_Triangulate);
+
+        aiMatrix4x4 rootMat = scene->mRootNode->mTransformation;
+
+        // Check if the import was successful
+        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+            throw std::runtime_error("Assimp error: " + std::string(Utils::importer.GetErrorString()));
+        }
+
+        std::unordered_map<Vertex, uint32_t> uniqueVertices {};
+
+        // Process each mesh in the scene
+        for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
+            aiMesh* mesh = scene->mMeshes[i];
+            
+            // Get material for this mesh
+            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+            //bool hasBones = mesh->HasBones();
+            //aiBone **bones = mesh->mBones;
+
+            //for (int j = 0; j < mesh->mNumBones; j++) {
+            //    if (bones[j]->mName.C_Str()[0] != 'D') {
+            //        continue; // skip bones that do basically nothing
+            //    }
+                //printf("MeshID %i, Bone #%i, name: %s, weights: %i\n", i, j, bones[j]->mName.C_Str(), bones[j]->mNumWeights);
+            //}
+
+            // Get diffuse texture path
+            aiString texturePath;
+            int textureID = 0; // Default to 0 if no texture
+            aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
+            
+            
+            if (ret == AI_SUCCESS) {
+                std::string texPath = "";
+                bool isEmbedded = false;
+
+                if (texturePath.C_Str()[0] == '*') {
+                    texPath = scene->mTextures[i]->mFilename.C_Str();
+                    isEmbedded = true;
+                } else {
+                    texPath = std::string("assets/textures/") + std::string(texturePath.C_Str());
+                }
+
+                // Check if texture path already exists in our global list
+                auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
+
+                if (it != VK::g_texturePathList.end()) {
+                    // Texture already exists, get its index
+                    textureID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
+                    //printf("Texture Exists: %i\n", textureID);
+                } else {
+                    // Check if file exists before adding
+                    bool exists = Utils::fileExistsZip(texPath);
+                    if (exists || isEmbedded) {
+                        // Add new texture path and get its index
+                        textureID = static_cast<int>(VK::g_texturePathList.size());
+                        
+                        Texture texture;
+                        texture.textureID = textureID;
+
+                        if (isEmbedded) {
+                            texture.createAssimpTextureImage(scene->mTextures[i]);
+                        } else {
+                            texture.createTextureImage(texPath.c_str());
+                        }
+                        texture.createTextureImageView();
+
+                        VK::textureMap[texPath] = texture;
+                        VK::g_texturePathList.push_back(texPath);
+                    }
+                }
+                //printf("Texture Path: %s, id: %i\n", texturePath.C_Str(), textureID);
+            }
+
+            // Process each face (triangle) in the mesh
+            for (unsigned int j = 0; j < mesh->mNumFaces; j++) {
+                aiFace& face = mesh->mFaces[j];
+
+                // Process each index in the face
+                for (unsigned int k = 0; k < face.mNumIndices; k++) {
+                    uint32_t index = face.mIndices[k];
+
+                    // Create a new vertex structure
+                    Vertex vertex{};
+
+                    aiVector3D vec = rootMat * mesh->mVertices[index];
+
+                    // Position (AI_DEFAULT) assumes a 3D vector format.
+                    vertex.pos = {
+                        vec.x,
+                        vec.y,
+                        vec.z
+                    };                
+
+                    // Texture coordinates (may be missing, but we check if valid)
+                    if (mesh->mTextureCoords[0] && j != -1) {
+                        vertex.texCoord = {
+                            mesh->mTextureCoords[0][index].x,
+                            1.0f - mesh->mTextureCoords[0][index].y // Manually flip the Y-coordinate
+                        };
+                        //printf("Texcoord #%i: %f %f\n", index, vertex.texCoord.x, vertex.texCoord.y);
+                    } else {
+                        vertex.texCoord = {0.0f, 0.0f}; // Default to (0, 0) if no texture coords
+                    }
+
+                    // Default color (white), as per original code
+                    vertex.color = {1.0f, 1.0f, 1.0f};
+                    
+                    // Store the texture ID
+                    vertex.textureID = textureID;
+                    //printf("Texture ID: %i\n", textureID);
+
+                    // If this vertex is not already in the unique list, add it
+                    if (uniqueVertices.count(vertex) == 0) {
+                        uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                        vertices.push_back(vertex);
+                    }
+
+                    // Add index to the indices list
+                    indices.push_back(uniqueVertices[vertex]);
+                }
+            }
+            vertices.shrink_to_fit();
+            indices.shrink_to_fit();
+        }
     }
 };

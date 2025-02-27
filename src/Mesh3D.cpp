@@ -8,13 +8,22 @@
 #include <chrono>
 
 // model loading
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <unordered_map>
+#include <vector>
+#include <stdexcept>
 
 void Mesh3D::init(const char *modelName) {
+    m_vertices.reserve(100000);
+    m_indices.reserve(100000);
+    
     loadModel(modelName);
     createVertexBuffer();
     createIndexBuffer();
+
+    printf("LOAD MODEL!!!!!!!!!!!!!!!\n");
 }
 
 void Mesh3D::destroy() {
@@ -77,121 +86,8 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
 }
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <unordered_map>
-#include <vector>
-#include <stdexcept>
-
 void Mesh3D::loadModel(const char* filename) {
-    // Import the model with postprocessing steps to ensure triangulation and texture coordinates
-    const aiScene* scene = Utils::importer.ReadFile(filename, aiProcess_Triangulate);
-    aiMatrix4x4 rootMat = scene->mRootNode->mTransformation;
-
-    // Check if the import was successful
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-        throw std::runtime_error("Assimp error: " + std::string(Utils::importer.GetErrorString()));
-    }
-
-    std::unordered_map<Vertex, uint32_t> uniqueVertices {};
-
-    // Process each mesh in the scene
-    for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
-        aiMesh* mesh = scene->mMeshes[i];
-        
-        // Get material for this mesh
-        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-
-        bool hasBones = mesh->HasBones();
-        aiBone **bones = mesh->mBones;
-
-        for (int j = 0; j < mesh->mNumBones; j++) {
-            if (bones[j]->mName.C_Str()[0] != 'D') {
-                continue; // skip bones that do basically nothing
-            }
-            printf("MeshID %i, Bone #%i, name: %s, weights: %i\n", i, j, bones[j]->mName.C_Str(), bones[j]->mNumWeights);
-        }
-
-        // Get diffuse texture path
-        aiString texturePath;
-        int textureID = 3; // Default to 0 if no texture
-        
-        aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
-
-        if (ret == AI_SUCCESS) {
-            std::string texPath = std::string("assets/textures/") + std::string(texturePath.C_Str());
-            //printf("Texture Path: %s\n", texPath.c_str());
-            
-            // Check if texture path already exists in our global list
-            auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
-            
-            if (it != VK::g_texturePathList.end()) {
-                // Texture already exists, get its index
-                textureID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
-            } else {
-                // Check if file exists before adding                
-                bool exists = Utils::fileExistsZip(texPath);
-                if (exists) {
-                    // Add new texture path and get its index
-                    textureID = static_cast<int>(VK::g_texturePathList.size());
-                    VK::g_texturePathList.push_back(texPath);
-                }
-            }
-            //printf("Texture ID: %i\n", textureID);
-        } else {
-            //printf("Texture: %s does not exist\n", texturePath.C_Str());
-        }
-
-        // Process each face (triangle) in the mesh
-        for (unsigned int j = 0; j < mesh->mNumFaces; j++) {
-            aiFace& face = mesh->mFaces[j];
-
-            // Process each index in the face
-            for (unsigned int k = 0; k < face.mNumIndices; k++) {
-                uint32_t index = face.mIndices[k];
-
-                // Create a new vertex structure
-                Vertex vertex{};
-
-                aiVector3D vec = rootMat * mesh->mVertices[index];
-
-                // Position (AI_DEFAULT) assumes a 3D vector format.
-                vertex.pos = {
-                    vec.x,
-                    vec.y,
-                    vec.z
-                };                
-
-                // Texture coordinates (may be missing, but we check if valid)
-                if (mesh->mTextureCoords[0] && j != -1) {
-                    vertex.texCoord = {
-                        mesh->mTextureCoords[0][index].x,
-                        1.0f - mesh->mTextureCoords[0][index].y // Manually flip the Y-coordinate
-                    };
-                    //printf("Texcoord #%i: %f %f\n", index, vertex.texCoord.x, vertex.texCoord.y);
-                } else {
-                    vertex.texCoord = {0.0f, 0.0f}; // Default to (0, 0) if no texture coords
-                }
-
-                // Default color (white), as per original code
-                vertex.color = {1.0f, 1.0f, 1.0f};
-                
-                // Store the texture ID
-                vertex.textureID = textureID;
-                //printf("Texture ID: %i\n", textureID);
-
-                // If this vertex is not already in the unique list, add it
-                if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(m_vertices.size());
-                    m_vertices.push_back(vertex);
-                }
-
-                // Add index to the indices list
-                m_indices.push_back(uniqueVertices[vertex]);
-            }
-        }
-    }
+    Assets::loadModel(filename, m_vertices, m_indices);
     updateModelMatrix();
 }
 

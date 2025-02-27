@@ -35,6 +35,7 @@
 #include <thread>
 
 #include <array>
+#include <atomic>
 
 #ifdef _WIN32
 #define NDEBUG
@@ -71,6 +72,8 @@ private:
     VkRenderPass uiRenderPass;
 
     VkDescriptorSetLayout descriptorSetLayout;
+
+    VkSampler textureSampler;
 
     // wip dual pipeline
     VkPipelineLayout pipelineLayout;
@@ -133,55 +136,78 @@ private:
         ImGui_ImplVulkan_CreateFontsTexture();
         Command::endSingleTimeCommands(commandBuffer);
 
-
         // disable config file
         io.IniFilename = NULL;
         io.LogFilename = NULL;
     }
 
-
     void initVulkan() {
+        printf("Volk Init\n");
         volkInitialize();
+        printf("Instance Init\n");
         createInstance();
+        printf("Debug Init\n");
         setupDebugMessenger();
+        printf("Surface Init\n");
         createSurface();
+        printf("Device Init\n");
         pickPhysicalDevice();
         createLogicalDevice();
+        printf("SwapChain Init\n");
         createSwapChain();
+        printf("ImageView Init\n");
         createImageViews();
 
+        printf("Renderpass Init\n");
         renderPass = createRenderPass(false);
         uiRenderPass = createRenderPass(true);
 
+        printf("CommandPool Init\n");
         createCommandPool();
+        printf("Color Init\n");
         createColorResources();
+        printf("Depth Init\n");
         createDepthResources();
+        printf("Framebuffer Init\n");
         createFramebuffers();
+        printf("CommandBuffer Init\n");
         createCommandBuffers();
 
-        mesh.init("assets/models/male_07.gltf");
-        mesh1.init("assets/models/flatgrass.gltf");
-        uiMesh.init("assets/models/Cube.gltf");
+        createTextureSampler();
 
-        textures.resize(VK::g_texturePathList.size());
-        for (int i = 0; i < VK::g_texturePathList.size(); i++) {
-            Texture *texture = &textures[i];
-            texture->createTextureSampler();
-            texture->createTextureImage(VK::g_texturePathList[i].c_str());
-            texture->createTextureImageView();
+        // we need UImesh immediately
+        printf("uiMesh Init\n");
+        uiMesh.init("assets/models/Cube.glb");
+        mesh.init("assets/models/male_07.glb");
+        printf("Mesh1 Init\n");
+        mesh1.init("assets/models/flatgrass.glb");
+            
+        printf("Texture Init\n");
+        textures.resize(VK::textureMap.size());
+        for (auto& tex: VK::textureMap) {
+            textures[tex.second.textureID] = tex.second;
+            printf("TextureID: %i\n", tex.second.textureID);
         }
 
+        printf("Descriptorset Layout Init\n");
         descriptorSetLayout = createDescriptorSetLayout(false);
 
+        printf("Pipeline Init\n");
         pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv");
 
+        printf("DescriptorPool Init\n");
         createDescriptorPool();        
+        printf("Sync Init\n");
         createSyncObjects();
+        printf("Uniform Init\n");
         createUniformBuffers();
-
+        
+        printf("GUI Init\n");
         setupUI(); // create UI textures before descriptorsets
+        printf("DescriptorSet Init\n");
         createDescriptorSets();
-
+        
+        printf("Uniform Init #2\n");
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             updateUniformBuffer(i);
         }
@@ -191,7 +217,9 @@ private:
     double last_time = 0;
     int frames = 0;
     int fps = 0;
+
     void mainLoop() {
+        // update camera matrix
         window.getCamera()->updateMatrix();
 
         while (!window.ShouldClose()) {
@@ -256,6 +284,8 @@ private:
         mesh.destroy();
         mesh1.destroy();
         uiMesh.destroy();
+        
+        vkDestroySampler(VK::device, textureSampler, nullptr);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroyBuffer(VK::device, uniformBuffers[i], nullptr);
@@ -866,6 +896,33 @@ private:
         }
     }
 
+    void createTextureSampler() {
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(VK::physicalDevice, &properties);
+
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = static_cast<float>(5.0);
+        samplerInfo.mipLodBias = 0.0f;
+
+        if (vkCreateSampler(VK::device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture sampler!");
+        }
+    }
+
     void createCommandPool() {
         QueueFamilyIndices queueFamilyIndices = findQueueFamilies(VK::physicalDevice);
 
@@ -1070,20 +1127,14 @@ private:
             // temporary: use only the first model descriptorsets
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
 
-            //uiMesh.position.x = camPos.x * -100.0;
-            //uiMesh.rotation.x = glm::radians(-90.0f);
-            //printf("camPos.x: %f\n", uiMesh.position.x);
-
             mesh.draw(commandBuffer, pipelineLayout);
             mesh1.draw(commandBuffer, pipelineLayout);
+
             if (window_open) {
                 uiMesh.draw(commandBuffer, pipelineLayout);
             }
 
-            
-
         vkCmdEndRenderPass(commandBuffer);
-        
         recordUI(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -1267,9 +1318,14 @@ private:
                 if (j < textures.size()) {
                     imageInfos[j].imageView = textures[j].textureImageView;
                 } else {
-                    imageInfos[j].imageView = textures[0].textureImageView;
+                    if (textures.size() <= 0) {
+                        //printf("UH, NOT GOOD!, textures don't exist\n");
+                        imageInfos[j].imageView = nullptr;
+                    } else {
+                        imageInfos[j].imageView = textures[0].textureImageView;
+                    }
                 }
-                imageInfos[j].sampler = nullptr; //textures[i].textureSampler;
+                imageInfos[j].sampler = textureSampler;
             }
 
             std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
@@ -1291,7 +1347,8 @@ private:
             descriptorWrites[1].pImageInfo = (imageInfos.data());
 
             VkDescriptorImageInfo samplerInfo = {};
-        	samplerInfo.sampler = textures[0].textureSampler;
+
+    	    samplerInfo.sampler = textureSampler;
 
             descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[2].dstSet = descriptorSets[frame];
@@ -1420,7 +1477,7 @@ private:
             uiNeedsUpdate = true;
             io.AddMousePosEvent(result.x * 200.0f, result.y * 400.0f);
         } else {
-            io.AddMousePosEvent(0.0, 0.0);
+            io.AddMousePosEvent(999.0, 999.0);
         }
 
         io.MouseDrawCursor = true;
@@ -1435,8 +1492,8 @@ private:
         ubo.view = window.getCamera()->getMatrix();
         ubo.proj = window.getProjectionMatrix();
         ubo.proj[1][1] *= -1;
-
-        ubo.sampler = textures[0].textureSampler;
+        
+        ubo.sampler = textureSampler;
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));    
     }
 

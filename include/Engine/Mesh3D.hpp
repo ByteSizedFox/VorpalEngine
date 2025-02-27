@@ -2,6 +2,11 @@
 #include <Engine/Vertex.hpp>
 #include "Engine/Texture.hpp"
 
+struct MeshData {
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+};
+
 class Mesh3D {
 private:
     glm::vec3 position = glm::vec3(0.0f,0.0f,0.0f);

@@ -93,8 +93,6 @@ glm::vec2 Window::getMouseVector() {
         last_mouse_pos = mouse_pos;
     }
 
-    printf("MouseVec: %f %f\n", xoffset, -yoffset);
-
     last_mouseVec = {xoffset, yoffset};
 
     return {xoffset, -yoffset};

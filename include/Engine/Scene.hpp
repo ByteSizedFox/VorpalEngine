@@ -1,6 +1,8 @@
+#pragma once
+
 #include <stdio.h>
 #include <vector>
-#include "Engine/Mesh3D.hpp"
+#include "Mesh3D.hpp"
 
 class Scene {
 private:

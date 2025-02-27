@@ -4,8 +4,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <functional>
-
 #include "Engine/Camera.hpp"
 
 class Window {
@@ -25,8 +23,6 @@ private:
     static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 
     glm::mat4 projectionMatrix;
-
-    std::function<void(double, double)> userMouseCallback;
 
 public:
     Camera camera;
@@ -60,9 +56,6 @@ public:
     }
     void updateProjectionMatrix(int width, int height) {
         projectionMatrix = glm::perspective(glm::radians(45.0f), (float) width / (float) height, 0.001f, 10.0f);
-    }
-    void setUserMouseCallback(std::function<void(double, double)> callback) {
-        userMouseCallback = callback;
     }
     Camera *getCamera() {
         return &camera;
