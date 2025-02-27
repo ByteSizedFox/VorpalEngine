@@ -13,7 +13,7 @@ private:
     glm::vec2 rotation = glm::vec3(0.0,0.0,0.0);
     glm::mat4 matrix = glm::mat4(1.0);
     glm::vec3 forward = glm::vec3(0.0,0.0,0.0);
-    bool isDirty = false;
+    bool isDirty = true;
 
 public:
     glm::vec3 getPosition() {

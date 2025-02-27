@@ -192,6 +192,8 @@ private:
     int frames = 0;
     int fps = 0;
     void mainLoop() {
+        window.getCamera()->updateMatrix();
+
         while (!window.ShouldClose()) {
             double now = glfwGetTime();
             frames++;
@@ -958,6 +960,61 @@ private:
         }
     }
 
+    void recordUI(VkCommandBuffer commandBuffer) {
+        Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1); 
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkRenderPassBeginInfo renderPassInfo{};
+
+        if (uiNeedsUpdate && window_open) {
+            // ui renderpass
+            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassInfo.renderPass = uiRenderPass;
+            renderPassInfo.framebuffer = uiFramebuffer;
+            renderPassInfo.renderArea.offset = {0, 0};
+            renderPassInfo.renderArea.extent = {200, 400};
+            std::array<VkClearValue, 2> clearValues{};
+            clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+            clearValues[1].depthStencil = {1.0f, 0};
+
+            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassInfo.pClearValues = clearValues.data();
+
+            vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+                    viewport.x = 0.0f;
+                    viewport.y = 0.0f;
+                    viewport.width = (float) 200;
+                    viewport.height = (float) 400;
+                    viewport.minDepth = 0.0f;
+                    viewport.maxDepth = 1.0f;
+                vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+                scissor.offset = {0, 0};
+                scissor.extent = {
+                    200,
+                    400
+                };
+                vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+                // draw imgui
+                ImGuiIO& io = ImGui::GetIO();
+                io.DisplaySize = ImVec2(200,400);
+
+                ImGui_ImplVulkan_NewFrame();
+                ImGui::NewFrame();
+
+                drawUI();
+
+                ImGui::Render();
+                ImDrawData* drawData = ImGui::GetDrawData();
+                ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+            vkCmdEndRenderPass(commandBuffer);
+            uiNeedsUpdate = false;
+        }
+        // transition UI framebuffer back
+        Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
+    }
+
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1027,51 +1084,7 @@ private:
 
         vkCmdEndRenderPass(commandBuffer);
         
-        Image::transitionImageLayout(uiTexture, swapChainImageFormat,
-                        VK_IMAGE_LAYOUT_UNDEFINED,
-                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1); 
-        
-        if (uiNeedsUpdate && window_open) {
-            // ui renderpass
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = uiRenderPass;
-            renderPassInfo.framebuffer = uiFramebuffer;
-            renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = {200, 400};
-
-            vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-                    viewport.x = 0.0f;
-                    viewport.y = 0.0f;
-                    viewport.width = (float) 200;
-                    viewport.height = (float) 400;
-                    viewport.minDepth = 0.0f;
-                    viewport.maxDepth = 1.0f;
-                vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-                scissor.offset = {0, 0};
-                scissor.extent = {
-                    200,
-                    400
-                };
-                vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-                // draw imgui
-                ImGuiIO& io = ImGui::GetIO();
-                io.DisplaySize = ImVec2(200,400);
-
-                ImGui_ImplVulkan_NewFrame();
-                ImGui::NewFrame();
-
-                drawUI();
-
-                ImGui::Render();
-                ImDrawData* drawData = ImGui::GetDrawData();
-                ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
-            vkCmdEndRenderPass(commandBuffer);
-            uiNeedsUpdate = false;
-        }
-        // transition UI framebuffer back
-        Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
+        recordUI(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
