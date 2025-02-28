@@ -235,7 +235,58 @@ namespace Image {
 
         vkBindImageMemory(VK::device, image, imageMemory, 0);
     }
-    inline void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
+
+// Helper function to check if a format is compressed
+inline bool isCompressedFormat(VkFormat format) {
+    // Check for common compressed formats
+    switch (format) {
+        // BC formats
+        case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
+        case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
+        case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
+        case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+        case VK_FORMAT_BC2_UNORM_BLOCK:
+        case VK_FORMAT_BC2_SRGB_BLOCK:
+        case VK_FORMAT_BC3_UNORM_BLOCK:
+        case VK_FORMAT_BC3_SRGB_BLOCK:
+        case VK_FORMAT_BC4_UNORM_BLOCK:
+        case VK_FORMAT_BC4_SNORM_BLOCK:
+        case VK_FORMAT_BC5_UNORM_BLOCK:
+        case VK_FORMAT_BC5_SNORM_BLOCK:
+        case VK_FORMAT_BC6H_UFLOAT_BLOCK:
+        case VK_FORMAT_BC6H_SFLOAT_BLOCK:
+        case VK_FORMAT_BC7_UNORM_BLOCK:
+        case VK_FORMAT_BC7_SRGB_BLOCK:
+        // ETC2/EAC formats
+        case VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK:
+        case VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK:
+        case VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK:
+        case VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK:
+        case VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK:
+        case VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK:
+        case VK_FORMAT_EAC_R11_UNORM_BLOCK:
+        case VK_FORMAT_EAC_R11_SNORM_BLOCK:
+        case VK_FORMAT_EAC_R11G11_UNORM_BLOCK:
+        case VK_FORMAT_EAC_R11G11_SNORM_BLOCK:
+        // ASTC formats (just a subset shown for brevity)
+        case VK_FORMAT_ASTC_4x4_UNORM_BLOCK:
+        case VK_FORMAT_ASTC_4x4_SRGB_BLOCK:
+        case VK_FORMAT_ASTC_5x4_UNORM_BLOCK:
+        case VK_FORMAT_ASTC_5x4_SRGB_BLOCK:
+        case VK_FORMAT_ASTC_6x5_UNORM_BLOCK:
+        case VK_FORMAT_ASTC_6x5_SRGB_BLOCK:
+        case VK_FORMAT_ASTC_8x8_UNORM_BLOCK:
+        case VK_FORMAT_ASTC_8x8_SRGB_BLOCK:
+        case VK_FORMAT_ASTC_10x10_UNORM_BLOCK:
+        case VK_FORMAT_ASTC_10x10_SRGB_BLOCK:
+        case VK_FORMAT_ASTC_12x12_UNORM_BLOCK:
+        case VK_FORMAT_ASTC_12x12_SRGB_BLOCK:
+            return true;
+        default:
+            return false;
+    }
+}
+inline void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
     VkCommandBuffer commandBuffer = Command::beginSingleTimeCommands();
 
     VkImageMemoryBarrier barrier{};
@@ -245,15 +296,29 @@ namespace Image {
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
+    // Set appropriate aspect mask based on format
+    if (format == VK_FORMAT_D32_SFLOAT || format == VK_FORMAT_D32_SFLOAT_S8_UINT || 
+            format == VK_FORMAT_D24_UNORM_S8_UINT) {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        
+        // Add stencil aspect if format has stencil component
+        if (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT) {
+            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    } else {
+        // For all color formats (including compressed formats)
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
+    // Standard transitions (works for both compressed and uncompressed formats)
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -268,7 +333,13 @@ namespace Image {
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } 
     // New transition: undefined to color attachment optimal (for rendering to texture)
+    // Note: This typically doesn't apply to compressed formats as they can't be used as render targets
     else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        // Check if format is compressed - if so, this is an invalid transition
+        if (isCompressedFormat(format)) {
+            throw std::invalid_argument("Cannot transition compressed format to COLOR_ATTACHMENT_OPTIMAL!");
+        }
+        
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
@@ -285,31 +356,24 @@ namespace Image {
     }
     // New transition: shader read only optimal to color attachment optimal (if reusing the texture)
     else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        // Check if format is compressed - if so, this is an invalid transition
+        if (isCompressedFormat(format)) {
+            throw std::invalid_argument("Cannot transition compressed format to COLOR_ATTACHMENT_OPTIMAL!");
+        }
+        
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
         sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
-    // Handle depth-related transitions if needed by checking the format
-    else if (format == VK_FORMAT_D32_SFLOAT || format == VK_FORMAT_D32_SFLOAT_S8_UINT || 
-             format == VK_FORMAT_D24_UNORM_S8_UINT) {
-        // Set aspect mask to depth for depth formats
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    // Handle depth-related transitions
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         
-        // Add stencil aspect if format has stencil component
-        if (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT) {
-            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }
-        
-        // Handle specific depth transitions
-        if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            
-            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        }
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     }
     else {
         throw std::invalid_argument("unsupported layout transition!");
@@ -326,6 +390,8 @@ namespace Image {
 
     Command::endSingleTimeCommands(commandBuffer);
 }
+
+
     inline void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
         VkCommandBuffer commandBuffer = Command::beginSingleTimeCommands();
 

@@ -7,3 +7,5 @@
 #define MAX_FRAMES_IN_FLIGHT 1
 
 #define WORLD_SCALE 0.0001f
+
+// #define ENABLE_MULTISAMPLE

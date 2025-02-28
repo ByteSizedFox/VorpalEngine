@@ -35,7 +35,7 @@
 #include <thread>
 
 #include <array>
-#include <atomic>
+#include <deque>
 
 #ifdef _WIN32
 #define NDEBUG
@@ -128,7 +128,11 @@ private:
         init_info.Subpass = 0;
         init_info.MinImageCount = 2;
         init_info.ImageCount = swapChainFramebuffers.size();
+#ifdef ENABLE_MULTISAMPLE
         init_info.MSAASamples = msaaSamples;
+#else
+        init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+#endif
         ImGui_ImplVulkan_Init(&init_info);
 
         // Upload ImGui fonts
@@ -556,17 +560,29 @@ private:
 
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapChainImageFormat;
+#ifdef ENABLE_MULTISAMPLE
         colorAttachment.samples = msaaSamples;
+#else
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+#endif
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#ifdef ENABLE_MULTISAMPLE
         colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+#else
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+#endif
 
         VkAttachmentDescription depthAttachment{};
         depthAttachment.format = Utils::findDepthFormat();
+#ifdef ENABLE_MULTISAMPLE
         depthAttachment.samples = msaaSamples;
+#else
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+#endif
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -608,7 +624,9 @@ private:
         if (!isUI) {
             subpass.pDepthStencilAttachment = &depthAttachmentRef;
         }
+#ifdef ENABLE_MULTISAMPLE
         subpass.pResolveAttachments = &colorAttachmentResolveRef;
+#endif
 
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -619,12 +637,20 @@ private:
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
         std::vector<VkAttachmentDescription> attachments;
+#ifdef ENABLE_MULTISAMPLE
         if (isUI) {
             
             attachments = { colorAttachment, colorAttachmentResolve };
         } else {
             attachments = {colorAttachment, depthAttachment, colorAttachmentResolve };
         }
+#else
+        if (isUI) {
+            attachments = { colorAttachment };
+        } else {
+            attachments = { colorAttachment, depthAttachment };
+        }
+#endif
 
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -632,9 +658,12 @@ private:
         renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
+#ifdef ENABLE_MULTISAMPLE
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
-
+#else
+        renderPassInfo.dependencyCount = 0;
+#endif
         if (vkCreateRenderPass(VK::device, &renderPassInfo, nullptr, &resultPass) != VK_SUCCESS) {
             throw std::runtime_error("failed to create render pass!");
         }
@@ -652,11 +681,17 @@ private:
         
         Image::createImage(200, 400, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
         uiTextureView = Image::createImageView(uiTexture, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-        
+
+#ifdef ENABLE_MULTISAMPLE
         std::array<VkImageView, 2> attachments = {
             colorImageView,
             uiTextureView
         };
+#else
+        std::array<VkImageView, 1> attachments = {
+            uiTextureView
+        };
+#endif
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -781,8 +816,11 @@ private:
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_FALSE;
-
+#ifdef ENABLE_MULTISAMPLE
         multisampling.rasterizationSamples = msaaSamples;
+#else
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+#endif
 
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -875,11 +913,18 @@ private:
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
         for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+#ifdef ENABLE_MULTISAMPLE
             std::array<VkImageView, 3> attachments = {
                 colorImageView,
                 depthImageView,
                 swapChainImageViews[i]
             };
+#else
+            std::array<VkImageView, 2> attachments = {
+                swapChainImageViews[i],
+                depthImageView,
+            };
+#endif
 
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -915,7 +960,7 @@ private:
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = static_cast<float>(5.0);
+        samplerInfo.maxLod = static_cast<float>(20.0);
         samplerInfo.mipLodBias = 0.0f;
 
         if (vkCreateSampler(VK::device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
@@ -938,14 +983,21 @@ private:
 
     void createColorResources() {
         VkFormat colorFormat = swapChainImageFormat;
+#ifdef ENABLE_MULTISAMPLE
         Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+#else
+        Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+#endif
         colorImageView = Image::createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
 
     void createDepthResources() {
         VkFormat depthFormat = Utils::findDepthFormat();
-
+#ifdef ENABLE_MULTISAMPLE
         Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+#else
+        Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+#endif
         depthImageView = Image::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
     }
 
@@ -1004,6 +1056,8 @@ private:
     }
 
     bool window_open = true;
+    std::deque<std::string> logText;
+    int incr = 0;
     void drawUI() {
         ImGui::SetNextWindowSize(ImVec2(200, 400));
         ImGui::SetNextWindowPos(ImVec2(0,0));
@@ -1011,8 +1065,26 @@ private:
         if (window_open) {
             ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
             ImGui::Text("FPS: %i", fps);
+            glm::vec3 pos = window.getCamera()->getPosition();
+            ImGui::Text("XYZ:\n%f \n%f \n%f", pos.x, pos.y, pos.z);
             ImGui::Text("Press Escape To Exit");
-            ImGui::Button("Press Me!");
+            if (ImGui::Button("Press Me!")) {
+                logText.push_back("Hello World! " + std::to_string(incr++));
+                while (logText.size() >= 5) {
+                    logText.pop_front();
+                }
+            }
+            
+            ImGui::BeginChild("Log", ImVec2(200, 50), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
+            for (int i = 0; i < logText.size(); i++) {
+                ImGui::Text("%s",logText[i].c_str());
+            }
+            // autoscroll
+            ImGui::SetScrollHereY(1.0f);
+
+            ImGui::EndChild();
+
             ImGui::End();
         }
     }
