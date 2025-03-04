@@ -21,6 +21,7 @@ void Window::init(int WIDTH, int HEIGHT) {
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetMouseButtonCallback(window, MouseButtonCallback);
+    glfwSetScrollCallback(window, scroll_callback);
 
     // DO NOT CHANGE, this fixes a conflict with the two renderpasses, only change if you're fixing the issue
     glfwSetWindowSizeLimits(window, 200, 400, GLFW_DONT_CARE, GLFW_DONT_CARE);
@@ -37,7 +38,7 @@ void Window::init(int WIDTH, int HEIGHT) {
     });
 
     // update initial projection matrix
-    projectionMatrix = glm::perspective(glm::radians(45.0f), (float) WIDTH / (float) HEIGHT, 0.001f, 10.0f);
+    projectionMatrix = glm::perspective(glm::radians(45.0f), (float) WIDTH / (float) HEIGHT, 0.001f, 1000.0f);
 
     // mouse and kb capture
     glfwSetKeyCallback(window, key_callback);
@@ -71,12 +72,10 @@ void Window::cursor_position_callback(GLFWwindow* window, double xpos, double yp
     app->mouse_pos = {xpos, ypos};
 
     // handle user input
-    glm::vec2 camRot = app->camera.getRotation();
-    glm::vec2 lastMousePos = app->last_mouse_pos;
     glm::vec2 mouseVec = app->getMouseVector();
-    camRot += (mouseVec * glm::vec2(-0.005f, 0.005f));
-    camRot.y = glm::clamp(camRot.y, glm::radians(-75.0f), glm::radians(75.0f));
-    app->camera.setRotation(camRot);
+    app->camera.pitch(-mouseVec.y * 0.001);
+    app->camera.yaw(mouseVec.x * 0.001);
+    
 }
 
 glm::vec2 Window::getMouseVector() {
@@ -114,6 +113,10 @@ void Window::key_callback(GLFWwindow* window, int key, int scancode, int action,
 void Window::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     ImGuiIO& io = ImGui::GetIO();
     if (button >= 0 && button < ImGuiMouseButton_COUNT)
-        printf("Button Event: %i -> %i\n", button, action);
         io.AddMouseButtonEvent(button, action == GLFW_PRESS);
+}
+
+void Window::scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMouseWheelEvent((float) xoffset, (float) yoffset);
 }

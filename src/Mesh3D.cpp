@@ -16,14 +16,11 @@
 #include <stdexcept>
 
 void Mesh3D::init(const char *modelName) {
+    fileName = modelName;
+    Logger::info("Reserving vertices & indices...");
     m_vertices.reserve(100000);
     m_indices.reserve(100000);
-    
-    loadModel(modelName);
-    createVertexBuffer();
-    createIndexBuffer();
-
-    printf("LOAD MODEL!!!!!!!!!!!!!!!\n");
+    Logger::success("Reserved vertices & indices");
 }
 
 void Mesh3D::destroy() {
@@ -89,16 +86,18 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 void Mesh3D::loadModel(const char* filename) {
     Assets::loadModel(filename, m_vertices, m_indices);
     updateModelMatrix();
+    
+    createVertexBuffer();
+    createIndexBuffer();
 }
 
 extern std::vector<Texture> textures;
 
 void Mesh3D::updateModelMatrix() {
-    glm::mat4 matrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.01));
-    matrix = glm::translate(matrix, position); // translate by index
-    matrix = glm::rotate(matrix, rotation.x, glm::vec3(1.0,0.0,0.0));
-    matrix = glm::rotate(matrix, rotation.y, glm::vec3(0.0,1.0,0.0));
-    matrix = glm::rotate(matrix, rotation.z, glm::vec3(0.0,0.0,1.0));
+    glm::mat4 matrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0));
+    matrix = glm::translate(matrix, position);
+    matrix *= glm::toMat4(rotationB);
+    
     modelMatrix = matrix;
 }
 

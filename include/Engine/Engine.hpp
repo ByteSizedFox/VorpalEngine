@@ -33,6 +33,7 @@ namespace VK {
     inline VkQueue graphicsQueue;
     inline VkSurfaceKHR surface;
     inline std::vector<std::string> g_texturePathList;
+    //inline std::vector<Texture> textures;
     inline std::unordered_map<std::string, Texture> textureMap;
 };
 
@@ -197,6 +198,98 @@ namespace Utils {
         matrix = glm::rotate(matrix, rotationB.z, glm::vec3(0.0,0.0,1.0));
         matrix = glm::scale(matrix, glm::vec3(WORLD_SCALE));
         return matrix;
+    }
+};
+
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+#include <vector>
+#include <cstdio>
+
+namespace Logger {
+    inline const char *colorMap[] = {
+        "\e[39m",       // reset
+        "\e[38;5;33m",  // info (bright blue)
+        "\e[38;5;40m",  // success (green)
+        "\e[38;5;178m", // warning (gold)
+        "\e[38;5;196m", // error (bright red)
+    };
+
+    // For storing log messages
+    inline std::vector<std::string> log_storage;
+    
+    // Track the previous log time
+    inline std::chrono::time_point<std::chrono::system_clock> last_log_time = std::chrono::system_clock::now();
+
+    inline std::string getTimestamp() {
+        auto now = std::chrono::system_clock::now();
+        auto time_t_now = std::chrono::system_clock::to_time_t(now);
+        
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+        return ss.str();
+    }
+
+    inline std::string getTimeDiff() {
+        auto now = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_log_time);
+        
+        std::stringstream ss;
+        ss << "+" << diff.count() << "ms";
+        
+        last_log_time = now;
+        return ss.str();
+    }
+
+    inline void logPrint(int color, const char *prefix, const char *message) {
+        auto timestamp = getTimestamp();
+        auto time_diff = getTimeDiff();
+        
+        printf("[%s] [%s] [%s%s\e[39m] %s\n", 
+               timestamp.c_str(), 
+               time_diff.c_str(),
+               colorMap[color], 
+               prefix, 
+               message);
+               
+        // Optionally store the log
+        std::stringstream log_entry;
+        log_entry << "[" << timestamp << "] [" << time_diff << "] [" << prefix << "] " << message;
+        log_storage.push_back(log_entry.str());
+    }
+
+    // getTimeDiff updates last_time because we still want time benchmarking when loglevel is low
+    inline void info(const char *msg) {
+        if (LOGLEVEL < 3) {
+            getTimeDiff();
+            return;
+        }
+        logPrint(1, "INFO", msg);
+    }
+    inline void success(const char *msg) {
+        if (LOGLEVEL < 2) {
+            getTimeDiff();
+            return;
+        }
+        logPrint(2, "SUCCESS", msg);
+    }
+    
+    inline void warning(const char *msg) {
+        if (LOGLEVEL < 1) {
+            getTimeDiff();
+            return;
+        }
+        logPrint(3, "WARNING", msg);
+    }
+    
+    inline void error(const char *msg) {
+        if (LOGLEVEL < 0) {
+            getTimeDiff();
+            return;
+        }
+        logPrint(4, "ERROR", msg);
     }
 };
 
@@ -475,9 +568,9 @@ namespace Experiment {
         // Check both triangles in the rectangle
         for (size_t i = 0; i < indices.size(); i += 3) {
             // Get the three vertices of the current triangle
-            const glm::vec3& vert0 = vertices[indices[i]];
-            const glm::vec3& vert1 = vertices[indices[i + 1]];
-            const glm::vec3& vert2 = vertices[indices[i + 2]];
+            const glm::vec3& vert0 = vertices[indices[i]] * glm::vec3(0.01);
+            const glm::vec3& vert1 = vertices[indices[i + 1]] * glm::vec3(0.01);
+            const glm::vec3& vert2 = vertices[indices[i + 2]] * glm::vec3(0.01);
 
             // Get the UVs for each vertex
             const glm::vec2& uv0 = uvs[indices[i]];
@@ -552,13 +645,12 @@ namespace Assets {
             int textureID = 0; // Default to 0 if no texture
             aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
             
-            
             if (ret == AI_SUCCESS) {
                 std::string texPath = "";
                 bool isEmbedded = false;
 
                 if (texturePath.C_Str()[0] == '*') {
-                    texPath = scene->mTextures[i]->mFilename.C_Str();
+                    texPath = scene->mMaterials[i]->GetName().C_Str();
                     isEmbedded = true;
                 } else {
                     texPath = std::string("assets/textures/") + std::string(texturePath.C_Str());
@@ -573,7 +665,11 @@ namespace Assets {
                     //printf("Texture Exists: %i\n", textureID);
                 } else {
                     // Check if file exists before adding
-                    bool exists = Utils::fileExistsZip(texPath);
+
+                    bool exists = false;
+                    if (!isEmbedded) {
+                        exists = Utils::fileExistsZip(texPath);
+                    }
                     if (exists || isEmbedded) {
                         // Add new texture path and get its index
                         textureID = static_cast<int>(VK::g_texturePathList.size());
@@ -593,6 +689,7 @@ namespace Assets {
                     }
                 }
                 //printf("Texture Path: %s, id: %i\n", texturePath.C_Str(), textureID);
+                //printf("Material Name: %s, id: %i\n", scene->mMaterials[i]->GetName().C_Str(), textureID);
             }
 
             // Process each face (triangle) in the mesh

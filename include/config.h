@@ -8,4 +8,6 @@
 
 #define WORLD_SCALE 0.0001f
 
-// #define ENABLE_MULTISAMPLE
+#define ENABLE_MULTISAMPLE
+
+#define LOGLEVEL 3

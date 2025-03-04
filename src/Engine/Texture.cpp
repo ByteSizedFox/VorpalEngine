@@ -124,60 +124,6 @@ void Texture::createAssimpTextureImage(aiTexture *tex) {
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
 
     generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
-
-    // int texWidth = tex->mWidth;
-    // int texHeight = tex->mHeight;
-    // int texChannels;
-    // unsigned char *buffer;
-
-    // if (tex->mHeight == 0) {
-    //     const unsigned char* compressedData = reinterpret_cast<const unsigned char*>(tex->pcData);
-    //     size_t compressedSize = tex->mWidth;
-    //     buffer = stbi_load_from_memory(
-    //         compressedData, compressedSize,
-    //         &texWidth, &texHeight, &texChannels, STBI_rgb_alpha
-    //     );
-    // } else {
-    //     texWidth = tex->mWidth;
-    //     texHeight = tex->mHeight;
-    //     unsigned char pixels[texWidth * texHeight * 4];
-    //     for (int y = 0; y < texHeight; y++) {
-    //         for (int x = 0; x < texWidth; x++) {
-    //             const aiTexel& texel = tex->pcData[y * texWidth + x];
-    //             unsigned char* pixel = &pixels[(y * texWidth + x) * 4];
-                
-    //             // Convert BGRA to RGBA
-    //             pixel[0] = texel.r; // R (from r in aiTexel)
-    //             pixel[1] = texel.g; // G (from g in aiTexel)
-    //             pixel[2] = texel.b; // B (from b in aiTexel)
-    //             pixel[3] = texel.a; // A (from a in aiTexel)
-    //         }
-    //     }
-    //     buffer = pixels;
-    // }
-
-    // printf("Assimp text info; w: %i, h: %i\n", texWidth, texHeight);
-
-    // VkBuffer stagingBuffer;
-    // VkDeviceMemory stagingBufferMemory;
-    // Memory::createBuffer(texWidth * texHeight * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-    // void* data;
-    // vkMapMemory(VK::device, stagingBufferMemory, 0, texWidth * texHeight * 4, 0, &data);
-    //     memcpy(data, buffer, static_cast<size_t>(texWidth * texHeight * 4));
-    // vkUnmapMemory(VK::device, stagingBufferMemory);
-
-    // uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-    // Image::createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
-
-    // Image::transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
-    // Image::copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-    // //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
-
-    // vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
-    // vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
-
-    // generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
 }
 
 void Texture::createTextureImage(const char *path) {

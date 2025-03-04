@@ -27,11 +27,13 @@ foreach(ASSET ${ASSET_FILES})
     )
 endforeach()
 
-# Create the zip archive from the staged directory
-file(ARCHIVE_CREATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
-    PATHS "${CMAKE_CURRENT_BINARY_DIR}/assets"
-    FORMAT zip
-    VERBOSE
+# Create the zip archive from the staged directory with minimal compression
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
+    COMMAND zip -0 -r "${CMAKE_CURRENT_BINARY_DIR}/assets.zip" assets
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/"
+    COMMENT "Creating assets.zip with minimal compression for faster decompression"
+    VERBATIM
 )
 
 # Copy to a simple name in the binary dir
@@ -91,6 +93,8 @@ add_subdirectory(external/Vulkan-Headers)
 add_subdirectory(external/glfw)
 add_subdirectory(external/glm)
 add_subdirectory(external/assimp)
+add_subdirectory(external/reactphysics3d)
+add_subdirectory(external/bullet3)
 
 target_include_directories (vorpal_engine PUBLIC
     external/Vulkan-Headers/include
@@ -101,10 +105,12 @@ target_include_directories (vorpal_engine PUBLIC
     external/assimp/include
     external/assimp/contrib/zip/src
     external/imgui
+    external/bullet3/src/
 )
 target_compile_definitions(vorpal_engine PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK=1)
 
-target_link_libraries(vorpal_engine glfw glm assimp)
+find_package(Bullet REQUIRED)
+target_link_libraries(vorpal_engine glfw glm assimp reactphysics3d ${BULLET_LIBRARIES})
 target_include_directories(vorpal_engine PRIVATE include)
 
 # windows, copy dlls to target

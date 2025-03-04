@@ -21,7 +21,8 @@ private:
     static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-
+    static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+    
     glm::mat4 projectionMatrix;
 
 public:
@@ -55,7 +56,7 @@ public:
         return projectionMatrix;
     }
     void updateProjectionMatrix(int width, int height) {
-        projectionMatrix = glm::perspective(glm::radians(45.0f), (float) width / (float) height, 0.001f, 10.0f);
+        projectionMatrix = glm::perspective(glm::radians(45.0f), (float) width / (float) height, 0.001f, 1000.0f);
     }
     Camera *getCamera() {
         return &camera;

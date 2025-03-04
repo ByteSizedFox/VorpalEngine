@@ -26,6 +26,8 @@
 #include "Engine/Mesh3D.hpp"
 #include "Engine/Window.hpp"
 #include "Engine/Camera.hpp"
+#include "Engine/Scene.hpp"
+#include "Engine/PhysicsManager.hpp"
 #include "VK/Validation.hpp"
 
 // imgui
@@ -33,7 +35,6 @@
 #include "backends/imgui_impl_vulkan.h"
 
 #include <thread>
-
 #include <array>
 #include <deque>
 
@@ -41,20 +42,29 @@
 #define NDEBUG
 #endif
 
-std::vector<Texture> textures;
-
 class Application {
 public:
     void run() {
+        Logger::info("Initializing Window...");
         window.init(800, 600);
+        Logger::success("Initialized Window");
+        Logger::info("Initializing Vulkan...");
         initVulkan();
+        Logger::success("Initialized Vulkan");
+        Logger::info("Initializing ImGUI...");
         initImGui();
+        Logger::success("Initialized ImGUI");
+        Logger::info("Initializing MainLoop...");
+
         mainLoop();
+        Logger::info("Exiting Application...");
         cleanup();
     }
 
 private:
     Window window;
+
+    Physics::PhysicsManager *physManager;
 
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -105,9 +115,15 @@ private:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
+    Scene mainScene;
     Mesh3D mesh;
     Mesh3D mesh1;
     Mesh3D uiMesh;
+
+    void ImGuiTheme() {
+        ImGuiStyle* style = &ImGui::GetStyle();
+        style->WindowRounding = 16.0f;
+    }
 
     void initImGui() {
 
@@ -143,14 +159,13 @@ private:
         // disable config file
         io.IniFilename = NULL;
         io.LogFilename = NULL;
+
+        ImGuiTheme();
     }
 
     void initVulkan() {
-        printf("Volk Init\n");
         volkInitialize();
-        printf("Instance Init\n");
         createInstance();
-        printf("Debug Init\n");
         setupDebugMessenger();
         printf("Surface Init\n");
         createSurface();
@@ -180,18 +195,26 @@ private:
         createTextureSampler();
 
         // we need UImesh immediately
-        printf("uiMesh Init\n");
-        uiMesh.init("assets/models/Cube.glb");
-        mesh.init("assets/models/male_07.glb");
-        printf("Mesh1 Init\n");
-        mesh1.init("assets/models/flatgrass.glb");
-            
-        printf("Texture Init\n");
-        textures.resize(VK::textureMap.size());
-        for (auto& tex: VK::textureMap) {
-            textures[tex.second.textureID] = tex.second;
-            printf("TextureID: %i\n", tex.second.textureID);
-        }
+        Logger::info("Initializing uiMesh...");
+        uiMesh.init("assets/models/Cube_B.glb");
+        uiMesh.loadModel(uiMesh.fileName.c_str());
+        Logger::success("Initialized uiMesh");
+
+        Logger::info("Initializing mesh...");
+        mesh.init("assets/models/testbox.glb");
+        Logger::success("Initialized mesh");
+
+        Logger::info("Initializing mesh1...");
+        mesh1.init("assets/models/flatgrass_lowdef.glb");
+        Logger::success("Initialized mesh1");
+
+        mesh.setRotation({0.0, glm::radians(45.0), glm::radians(45.0)});
+        mesh.setPosition({0.01,0.5,0.01});
+
+        physManager = new Physics::PhysicsManager(&mesh, &window.camera);
+        
+        mainScene.add_object(&mesh);
+        mainScene.add_object(&mesh1);
 
         printf("Descriptorset Layout Init\n");
         descriptorSetLayout = createDescriptorSetLayout(false);
@@ -205,7 +228,6 @@ private:
         createSyncObjects();
         printf("Uniform Init\n");
         createUniformBuffers();
-        
         printf("GUI Init\n");
         setupUI(); // create UI textures before descriptorsets
         printf("DescriptorSet Init\n");
@@ -224,7 +246,7 @@ private:
 
     void mainLoop() {
         // update camera matrix
-        window.getCamera()->updateMatrix();
+        window.getCamera()->updateViewMatrix();
 
         while (!window.ShouldClose()) {
             double now = glfwGetTime();
@@ -296,10 +318,7 @@ private:
             vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
         }
 
-        for (int i = 0; i < textures.size(); i++) {
-            Texture *texture = &textures[i];
-            texture->destroy();
-        }
+        mainScene.destroy();
 
         vkDestroyDescriptorPool(VK::device, descriptorPool, nullptr);
 
@@ -639,7 +658,6 @@ private:
         std::vector<VkAttachmentDescription> attachments;
 #ifdef ENABLE_MULTISAMPLE
         if (isUI) {
-            
             attachments = { colorAttachment, colorAttachmentResolve };
         } else {
             attachments = {colorAttachment, depthAttachment, colorAttachmentResolve };
@@ -679,7 +697,7 @@ private:
 
     void setupUI() {
         
-        Image::createImage(200, 400, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
+        Image::createImage(320, 180, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
         uiTextureView = Image::createImageView(uiTexture, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 
 #ifdef ENABLE_MULTISAMPLE
@@ -698,8 +716,8 @@ private:
         framebufferInfo.renderPass = uiRenderPass;
         framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = 200;
-        framebufferInfo.height = 400;
+        framebufferInfo.width = 320;
+        framebufferInfo.height = 180;
         framebufferInfo.layers = 1;
 
         if (vkCreateFramebuffer(VK::device, &framebufferInfo, nullptr, &uiFramebuffer) != VK_SUCCESS) {
@@ -1058,38 +1076,27 @@ private:
     bool window_open = true;
     std::deque<std::string> logText;
     int incr = 0;
+    bool enablePopup = false;
     void drawUI() {
-        ImGui::SetNextWindowSize(ImVec2(200, 400));
+        ImGui::SetNextWindowSize(ImVec2(320, 180));
         ImGui::SetNextWindowPos(ImVec2(0,0));
         
         if (window_open) {
-            ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+            ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
             ImGui::Text("FPS: %i", fps);
             glm::vec3 pos = window.getCamera()->getPosition();
             ImGui::Text("XYZ:\n%f \n%f \n%f", pos.x, pos.y, pos.z);
             ImGui::Text("Press Escape To Exit");
+
             if (ImGui::Button("Press Me!")) {
-                logText.push_back("Hello World! " + std::to_string(incr++));
-                while (logText.size() >= 5) {
-                    logText.pop_front();
-                }
+                enablePopup = true;
             }
-            
-            ImGui::BeginChild("Log", ImVec2(200, 50), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-
-            for (int i = 0; i < logText.size(); i++) {
-                ImGui::Text("%s",logText[i].c_str());
-            }
-            // autoscroll
-            ImGui::SetScrollHereY(1.0f);
-
-            ImGui::EndChild();
 
             ImGui::End();
         }
     }
 
-    void recordUI(VkCommandBuffer commandBuffer) {
+    void recordUI(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer frameBuffer) {
         Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1); 
         VkViewport viewport{};
         VkRect2D scissor{};
@@ -1098,10 +1105,10 @@ private:
         if (uiNeedsUpdate && window_open) {
             // ui renderpass
             renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = uiRenderPass;
-            renderPassInfo.framebuffer = uiFramebuffer;
+            renderPassInfo.renderPass = renderPass;
+            renderPassInfo.framebuffer = frameBuffer;
             renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = {200, 400};
+            renderPassInfo.renderArea.extent = {320, 180};
             std::array<VkClearValue, 2> clearValues{};
             clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
             clearValues[1].depthStencil = {1.0f, 0};
@@ -1112,27 +1119,28 @@ private:
             vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
                     viewport.x = 0.0f;
                     viewport.y = 0.0f;
-                    viewport.width = (float) 200;
-                    viewport.height = (float) 400;
+                    viewport.width = (float) 320;
+                    viewport.height = (float) 180;
                     viewport.minDepth = 0.0f;
                     viewport.maxDepth = 1.0f;
                 vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
                 scissor.offset = {0, 0};
                 scissor.extent = {
-                    200,
-                    400
+                    320,
+                    180
                 };
                 vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
                 // draw imgui
                 ImGuiIO& io = ImGui::GetIO();
-                io.DisplaySize = ImVec2(200,400);
+                io.DisplaySize = ImVec2(320,180);
 
                 ImGui_ImplVulkan_NewFrame();
                 ImGui::NewFrame();
 
                 drawUI();
+                mainScene.drawUI();
 
                 ImGui::Render();
                 ImDrawData* drawData = ImGui::GetDrawData();
@@ -1143,6 +1151,8 @@ private:
         // transition UI framebuffer back
         Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
     }
+
+    
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
@@ -1169,7 +1179,6 @@ private:
         if (uiNeedsUpdate && window_open) {
             updateDescriptorSets(currentFrame);
         }
-        
 
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
@@ -1199,15 +1208,16 @@ private:
             // temporary: use only the first model descriptorsets
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
 
-            mesh.draw(commandBuffer, pipelineLayout);
-            mesh1.draw(commandBuffer, pipelineLayout);
-
+            if (mainScene.isReady) {
+                mainScene.draw(commandBuffer, pipelineLayout);
+            }
             if (window_open) {
                 uiMesh.draw(commandBuffer, pipelineLayout);
             }
 
         vkCmdEndRenderPass(commandBuffer);
-        recordUI(commandBuffer);
+
+        recordUI(commandBuffer, uiRenderPass, uiFramebuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
@@ -1236,6 +1246,7 @@ private:
     }
 
     void drawFrame() {
+
         vkWaitForFences(VK::device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
@@ -1305,7 +1316,12 @@ private:
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
-        
+        // load scene if not loaded
+        if (!mainScene.isReady) {
+            Logger::info("Loading Main Scene...");
+            mainScene.init();
+            Logger::success("Loaded Main Scene");
+        }
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -1387,14 +1403,14 @@ private:
             std::vector<VkDescriptorImageInfo> imageInfos(75);
             for (size_t j = 0; j < 75; ++j) {
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                if (j < textures.size()) {
-                    imageInfos[j].imageView = textures[j].textureImageView;
+                if (j < mainScene.textures.size()) {
+                    imageInfos[j].imageView = mainScene.textures[j].textureImageView;
                 } else {
-                    if (textures.size() <= 0) {
+                    if (mainScene.textures.size() <= 0) {
                         //printf("UH, NOT GOOD!, textures don't exist\n");
-                        imageInfos[j].imageView = nullptr;
+                        imageInfos[j].imageView = uiTextureView;
                     } else {
-                        imageInfos[j].imageView = textures[0].textureImageView;
+                        imageInfos[j].imageView = mainScene.textures[0].textureImageView;
                     }
                 }
                 imageInfos[j].sampler = textureSampler;
@@ -1458,11 +1474,16 @@ private:
         }
     }
 
-    glm::vec2 camRot = glm::vec3(0.0,0.0,0.0);
-    glm::vec3 camPos = glm::vec3(0.0,0.0,0.0);
+    double last_deltatime = glfwGetTime();
 
     void handle_input() {
-        glm::vec2 camRot = window.getCamera()->getRotation();
+        double time = glfwGetTime();
+        double deltaTime = time - last_deltatime;
+        last_deltatime = time;
+
+        physManager->process(deltaTime);
+
+        //glm::vec2 camRot = window.getCamera()->getRotation();
         glm::vec3 camPos = window.getCamera()->getPosition();
 
         //glm::vec2 mouseVec = window.getMouseVector();
@@ -1475,53 +1496,47 @@ private:
             window_open = true;
 
             // 1. Position the object in front of the camera
-            float distance = 0.8f;
+            float distance = 0.01f;
 
-            uiMesh.setPosition((camPos * glm::vec3(-100.0)) + -forward * distance);
+            uiMesh.setPosition(camPos + -forward * distance);
             uiMesh.updateModelMatrix();
 
-            glm::vec3 objectToCamera = (camPos * glm::vec3(-100.0)) - uiMesh.getPosition();
+            glm::vec3 objectToCamera = (camPos) - uiMesh.getPosition();
             float yaw = std::atan2(objectToCamera.x, objectToCamera.z);
             float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
 
             // 4. Set the rotation (assuming your rotation is in radians)
-            uiMesh.setRotation({0.0, yaw, glm::radians(90.0f)});
+            uiMesh.setRotation({yaw, 0.0, glm::radians(90.0f)});
         }
 
-        float speed = 0.0005f;
+        float speed = 50.0f * deltaTime;
 
         if (window.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
             speed *= 2;
         }
 
+        glm::vec3 camVec = glm::vec3(0.0);
         if (window.isKeyPressed(GLFW_KEY_W)) {
-            camPos += forward * glm::vec3(speed);
+            camVec += glm::normalize(glm::vec3(-forward.x, 0.0f, -forward.z)) * glm::vec3(speed);
         }
         if (window.isKeyPressed(GLFW_KEY_S)) {
-            camPos -= forward * glm::vec3(speed);
+            camVec -= glm::normalize(glm::vec3(-forward.x, 0.0f, -forward.z)) * glm::vec3(speed);
         }
         if (window.isKeyPressed(GLFW_KEY_A)) {
-            camPos -= glm::cross(forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
+            camVec -= glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
         if (window.isKeyPressed(GLFW_KEY_D)) {
-            camPos += glm::cross(forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
+            camVec += glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
-
+        
         // up
         if (window.isKeyPressed(GLFW_KEY_SPACE)) {
-            camPos.y -= speed;
+            camVec.y += speed;
         }
         if (window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
-            camPos.y += speed;
+            camVec.y -= speed;
         }
-
-        // apply changes
-        //if (camera.getRotation() != camRot) {
-        //    camera.setRotation(camRot);
-        //}
-        if (window.getCamera()->getPosition() != camPos) {
-            window.getCamera()->setPosition(camPos);
-        }
+        window.getCamera()->setVelocity(camVec);
         
         // skip UI stuff if window not open
         if (!window_open) {
@@ -1539,7 +1554,7 @@ private:
         // raycast to 
         glm::vec2 result;
         float distance;
-        bool hit = Experiment::raycastRectangle(camPos * glm::vec3(-1.0), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getMatrix(), window.getProjectionMatrix(), distance, result);
+        bool hit = Experiment::raycastRectangle(camPos, -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getViewMatrix(), window.getProjectionMatrix(), distance, result);
         
         if (ImGui::GetCurrentContext() == nullptr) {
             return;
@@ -1547,13 +1562,11 @@ private:
         ImGuiIO& io = ImGui::GetIO();
         if (distance <= 1.0 && hit) {
             uiNeedsUpdate = true;
-            io.AddMousePosEvent(result.x * 200.0f, result.y * 400.0f);
+            io.AddMousePosEvent(result.x * 320.0f, result.y * 180.0f);
         } else {
             io.AddMousePosEvent(999.0, 999.0);
         }
-
         io.MouseDrawCursor = true;
-        
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
@@ -1561,7 +1574,7 @@ private:
 
         handle_input();
 
-        ubo.view = window.getCamera()->getMatrix();
+        ubo.view = window.getCamera()->getViewMatrix();
         ubo.proj = window.getProjectionMatrix();
         ubo.proj[1][1] *= -1;
         

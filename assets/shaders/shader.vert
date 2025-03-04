@@ -20,7 +20,7 @@ layout(location = 2) out int f_textureID;
 layout(location = 3) out int f_isUI;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * PushConstants.model * vec4(inPosition, 1.0);
+    gl_Position = (ubo.proj * ubo.view * PushConstants.model * vec4(inPosition, 100.0));
     fragColor = inColor;
     fragTexCoord = inTexCoord;
     f_textureID = textureID;

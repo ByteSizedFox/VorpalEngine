@@ -1,6 +1,12 @@
+#pragma once
 #include <vector>
+#include <atomic>
+
 #include <Engine/Vertex.hpp>
 #include "Engine/Texture.hpp"
+
+#include "glm/gtc/quaternion.hpp"
+#include "glm/gtx/quaternion.hpp"
 
 struct MeshData {
     std::vector<Vertex> vertices;
@@ -10,11 +16,13 @@ struct MeshData {
 class Mesh3D {
 private:
     glm::vec3 position = glm::vec3(0.0f,0.0f,0.0f);
-    glm::vec3 rotation = glm::vec3(0.0f,0.0f,0.0f);
+    glm::quat rotationB;
+
     glm::mat4 modelMatrix = glm::mat4(1.0);
     bool isDirty = false;
-
 public:
+    std::string fileName;
+    
     std::vector<Vertex> m_vertices;
     std::vector<uint32_t> m_indices;
 
@@ -22,8 +30,6 @@ public:
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
-
-    
 
     bool isUI = false;
 
@@ -47,13 +53,23 @@ public:
         isDirty = true;
     }
     void setRotation(glm::vec3 rotation) {
-        this->rotation = rotation;
+        this->rotationB = glm::quat(rotation);
         isDirty = true;
     }
     glm::vec3 getRotation() {
-        return rotation;
+        return glm::eulerAngles(rotationB);
+    }
+    glm::quat getOrientation() {
+        return rotationB;
+    }
+    void setOrientation(glm::quat rot) {
+        rotationB = rot;
     }
     glm::vec3 getPosition() {
         return position;
+    }
+    void setMatrix(glm::mat4 mat) {
+        modelMatrix = mat;
+        isDirty = false;
     }
 };
