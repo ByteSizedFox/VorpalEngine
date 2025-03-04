@@ -201,7 +201,7 @@ private:
         Logger::success("Initialized uiMesh");
 
         Logger::info("Initializing mesh...");
-        mesh.init("assets/models/testbox.glb");
+        mesh.init("assets/models/testCube.glb");
         Logger::success("Initialized mesh");
 
         Logger::info("Initializing mesh1...");
@@ -262,10 +262,7 @@ private:
                 printf("FPS: %i\n", fps);
                 uiNeedsUpdate = true;
             }
-
-            
         }
-
         vkDeviceWaitIdle(VK::device);
     }
 

@@ -69,6 +69,7 @@ namespace Physics {
             btDefaultMotionState* motionState = new btDefaultMotionState(bodyTransform);
 
             bodyShape->setMargin(0.001);
+            
 
             btRigidBody* meshBody = new btRigidBody(
                 btRigidBody::btRigidBodyConstructionInfo(
@@ -129,8 +130,6 @@ namespace Physics {
             body = createMeshBody();
             body->setActivationState(DISABLE_DEACTIVATION);
             body->setFriction(2.0f);
-            //body->setCcdMotionThreshold(0.0001f);
-            //body->setCcdSweptSphereRadius(0.2f);
 
             cameraBody = createCameraBody();
             cameraBody->setActivationState(DISABLE_DEACTIVATION);
@@ -152,18 +151,10 @@ namespace Physics {
         void process(float deltaTime) {
             dynamicsWorld->stepSimulation(deltaTime, 1.0);
 
-            //btTransform cameraTransform;
-            //cameraTransform.setIdentity();
-            //cameraTransform.setOrigin(worldToPhysics(camera->getPosition()));
-            //cameraBody->setWorldTransform(cameraTransform);
-
             cameraBody->applyCentralForce(worldToPhysics(camera->getVelocity()));
             camera->resetVelocity();
 
             camera->setPosition(physicsToWorld(cameraBody->getWorldTransform().getOrigin()));
-            //btQuaternion rot = cameraBody->getWorldTransform().getRotation();
-            //camera->setOrientation(glm::quat(rot.getX(), rot.getY(), rot.getZ(), rot.getW()));
-
             syncMesh(mesh, body);
         }
     };

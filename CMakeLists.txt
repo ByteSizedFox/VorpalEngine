@@ -93,14 +93,12 @@ add_subdirectory(external/Vulkan-Headers)
 add_subdirectory(external/glfw)
 add_subdirectory(external/glm)
 add_subdirectory(external/assimp)
-add_subdirectory(external/reactphysics3d)
-add_subdirectory(external/bullet3)
+#add_subdirectory(external/bullet3)
 
 target_include_directories (vorpal_engine PUBLIC
     external/Vulkan-Headers/include
     external/glfw/include
     external/glm/
-    external/tinyobjloader
     external/volk/
     external/assimp/include
     external/assimp/contrib/zip/src
@@ -110,7 +108,7 @@ target_include_directories (vorpal_engine PUBLIC
 target_compile_definitions(vorpal_engine PUBLIC IMGUI_IMPL_VULKAN_USE_VOLK=1)
 
 find_package(Bullet REQUIRED)
-target_link_libraries(vorpal_engine glfw glm assimp reactphysics3d ${BULLET_LIBRARIES})
+target_link_libraries(vorpal_engine glfw glm assimp ${BULLET_LIBRARIES})
 target_include_directories(vorpal_engine PRIVATE include)
 
 # windows, copy dlls to target

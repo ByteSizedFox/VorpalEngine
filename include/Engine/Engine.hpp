@@ -626,6 +626,8 @@ namespace Assets {
         // Process each mesh in the scene
         for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
             aiMesh* mesh = scene->mMeshes[i];
+
+            printf("Loading mesh: %s\n", mesh->mName.C_Str());
             
             // Get material for this mesh
             aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
