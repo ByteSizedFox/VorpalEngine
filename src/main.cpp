@@ -201,7 +201,7 @@ private:
         Logger::success("Initialized uiMesh");
 
         Logger::info("Initializing mesh...");
-        mesh.init("assets/models/testCube.glb");
+        mesh.init("assets/models/testbox.glb");
         Logger::success("Initialized mesh");
 
         Logger::info("Initializing mesh1...");
