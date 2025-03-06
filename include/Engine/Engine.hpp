@@ -199,6 +199,22 @@ namespace Utils {
         matrix = glm::scale(matrix, glm::vec3(WORLD_SCALE));
         return matrix;
     }
+    inline void createUIMesh(float aspect, std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
+        m_vertices.clear();
+        m_indices.clear();
+        float width = 0.2;
+        float height = (width * (1.0/aspect));
+        
+        m_indices = {2,1,0, 5,4,3};
+
+        m_vertices.push_back({glm::vec3( width, -height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(1.0, 1.0), 0});
+        m_vertices.push_back({glm::vec3(-width,  height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0), 0});
+        m_vertices.push_back({glm::vec3( width,  height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(1.0, 0.0), 0});
+
+        m_vertices.push_back({glm::vec3( width, -height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(1.0, 1.0), 0});
+        m_vertices.push_back({glm::vec3(-width, -height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 1.0), 0});
+        m_vertices.push_back({glm::vec3(-width,  height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0), 0});
+    }
 };
 
 #include <chrono>
@@ -568,9 +584,9 @@ namespace Experiment {
         // Check both triangles in the rectangle
         for (size_t i = 0; i < indices.size(); i += 3) {
             // Get the three vertices of the current triangle
-            const glm::vec3& vert0 = vertices[indices[i]] * glm::vec3(0.01);
-            const glm::vec3& vert1 = vertices[indices[i + 1]] * glm::vec3(0.01);
-            const glm::vec3& vert2 = vertices[indices[i + 2]] * glm::vec3(0.01);
+            const glm::vec3& vert0 = vertices[indices[i]] * glm::vec3(WORLD_SCALE);
+            const glm::vec3& vert1 = vertices[indices[i + 1]] * glm::vec3(WORLD_SCALE);
+            const glm::vec3& vert2 = vertices[indices[i + 2]] * glm::vec3(WORLD_SCALE);
 
             // Get the UVs for each vertex
             const glm::vec2& uv0 = uvs[indices[i]];
@@ -609,7 +625,7 @@ namespace Experiment {
 };
 
 namespace Assets {
-    inline void loadModel(const char* filename, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) {
+    inline void loadModel(const char* filename, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices, glm::vec3 &AA, glm::vec3 &BB) {
         // Import the model with postprocessing steps to ensure triangulation and texture coordinates
         std::vector<char> model = std::move(Utils::readFileZip(filename));
         const aiScene* scene = Utils::importer.ReadFileFromMemory(model.data(), model.size(), aiProcess_Triangulate);
@@ -623,11 +639,14 @@ namespace Assets {
 
         std::unordered_map<Vertex, uint32_t> uniqueVertices {};
 
+        glm::vec3 minVec = glm::vec3(99999.0);
+        glm::vec3 maxVec = glm::vec3(-99999.0);
+
         // Process each mesh in the scene
         for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
             aiMesh* mesh = scene->mMeshes[i];
 
-            printf("Loading mesh: %s\n", mesh->mName.C_Str());
+            //printf("Loading mesh: %s\n", mesh->mName.C_Str());
             
             // Get material for this mesh
             aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
@@ -712,7 +731,28 @@ namespace Assets {
                         vec.x,
                         vec.y,
                         vec.z
-                    };                
+                    };
+
+                    // to get AABB
+                    if (vertex.pos.x < minVec.x) {
+                        minVec.x = vertex.pos.x;
+                    }
+                    if (vertex.pos.y < minVec.y) {
+                        minVec.y = vertex.pos.y;
+                    }
+                    if (vertex.pos.z < minVec.z) {
+                        minVec.z = vertex.pos.z;
+                    }
+
+                    if (vertex.pos.x > maxVec.x) {
+                        maxVec.x = vertex.pos.x;
+                    }
+                    if (vertex.pos.y > maxVec.y) {
+                        maxVec.y = vertex.pos.y;
+                    }
+                    if (vertex.pos.z > maxVec.z) {
+                        maxVec.z = vertex.pos.z;
+                    }
 
                     // Texture coordinates (may be missing, but we check if valid)
                     if (mesh->mTextureCoords[0] && j != -1) {
@@ -724,6 +764,10 @@ namespace Assets {
                     } else {
                         vertex.texCoord = {0.0f, 0.0f}; // Default to (0, 0) if no texture coords
                     }
+
+                    //if (strcmp(filename, "assets/models/Cube_B.glb")) {
+                    //printf("VERTEX: %f %f %f, %f %f\n", vec.x, vec.y, vec.z, vertex.texCoord.x, vertex.texCoord.y);
+                    //}
 
                     // Default color (white), as per original code
                     vertex.color = {1.0f, 1.0f, 1.0f};
@@ -745,5 +789,13 @@ namespace Assets {
             vertices.shrink_to_fit();
             indices.shrink_to_fit();
         }
+
+        // store model AABB
+        AA.x = minVec.x;
+        AA.y = minVec.y;
+        AA.z = minVec.z;
+        BB.x = maxVec.x;
+        BB.y = maxVec.y;
+        BB.z = maxVec.z;
     }
 };

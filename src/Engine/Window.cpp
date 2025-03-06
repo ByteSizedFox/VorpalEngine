@@ -1,4 +1,4 @@
-#include "Window.hpp"
+#include "Engine/Window.hpp"
 
 #include "glm/gtc/matrix_transform.hpp"
 
@@ -24,7 +24,7 @@ void Window::init(int WIDTH, int HEIGHT) {
     glfwSetScrollCallback(window, scroll_callback);
 
     // DO NOT CHANGE, this fixes a conflict with the two renderpasses, only change if you're fixing the issue
-    glfwSetWindowSizeLimits(window, 200, 400, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwSetWindowSizeLimits(window, UI_WIDTH, UI_HEIGHT, GLFW_DONT_CARE, GLFW_DONT_CARE);
     
     // mouse and kb capture
     glfwSetWindowFocusCallback(window, [](GLFWwindow* window, int focused) {
@@ -43,6 +43,8 @@ void Window::init(int WIDTH, int HEIGHT) {
     // mouse and kb capture
     glfwSetKeyCallback(window, key_callback);
     memset(key_pressed, false, 1024);
+
+    camera.createRigidBody();
 }
 bool Window::ShouldClose() {
     return glfwWindowShouldClose(window);

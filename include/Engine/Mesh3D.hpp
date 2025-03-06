@@ -4,23 +4,29 @@
 
 #include <Engine/Vertex.hpp>
 #include "Engine/Texture.hpp"
+#include "Engine/Node3D.hpp"
 
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtx/quaternion.hpp"
+// physics
+#include "btBulletDynamicsCommon.h"
+#include "LinearMath/btVector3.h"
+#include "LinearMath/btAlignedObjectArray.h"
 
-struct MeshData {
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+// to differentiate collider types
+enum ColliderType {
+    BOX,
+    CONVEXHULL,
+    TRIMESH
 };
 
-class Mesh3D {
-private:
-    glm::vec3 position = glm::vec3(0.0f,0.0f,0.0f);
-    glm::quat rotationB;
-
-    glm::mat4 modelMatrix = glm::mat4(1.0);
-    bool isDirty = false;
+class Mesh3D : public Node3D {
 public:
+    bool hasPhysics = false;
+
+    btRigidBody* rigidBody;
+
+    glm::vec3 AA;
+    glm::vec3 BB;
+    
     std::string fileName;
     
     std::vector<Vertex> m_vertices;
@@ -42,34 +48,11 @@ public:
     void createVertexBuffer();
     void createIndexBuffer();
     void loadModel(const char* filename);
+    void loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices);
 
     ModelBufferObject getModelMatrix();
     void updateModelMatrix();
     void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
     void updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
-
-    void setPosition(glm::vec3 position) {
-        this->position = position;
-        isDirty = true;
-    }
-    void setRotation(glm::vec3 rotation) {
-        this->rotationB = glm::quat(rotation);
-        isDirty = true;
-    }
-    glm::vec3 getRotation() {
-        return glm::eulerAngles(rotationB);
-    }
-    glm::quat getOrientation() {
-        return rotationB;
-    }
-    void setOrientation(glm::quat rot) {
-        rotationB = rot;
-    }
-    glm::vec3 getPosition() {
-        return position;
-    }
-    void setMatrix(glm::mat4 mat) {
-        modelMatrix = mat;
-        isDirty = false;
-    }
+    void createRigidBody(float mass, ColliderType colliderType, float colliderPercent);
 };

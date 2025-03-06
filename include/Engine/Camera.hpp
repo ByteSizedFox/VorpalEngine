@@ -9,6 +9,13 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+// physics
+#include "btBulletDynamicsCommon.h"
+#include "LinearMath/btVector3.h"
+#include "LinearMath/btAlignedObjectArray.h"
+
+#include "config.h"
+
 class Camera {
 private:
     glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -23,6 +30,8 @@ private:
 
 public:
     Camera() = default;
+
+    btRigidBody* rigidBody;
     
     // Getters
     glm::vec3 getPosition() const {
@@ -172,7 +181,7 @@ public:
         glm::mat4 rotationMatrix = glm::mat4_cast(glm::conjugate(orientation));
         
         // Create translation matrix
-        glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), -position);
+        glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), -position * glm::vec3(WORLD_SCALE));
         
         // Combine for view matrix
         viewMatrix = rotationMatrix * translationMatrix;
@@ -190,5 +199,32 @@ public:
     }
     void resetVelocity() {
         velocity = glm::vec3(0.0);
+    }
+
+    void createRigidBody() {
+        btCollisionShape* bodyShape = new btCapsuleShape(0.5, 1.0);
+        btTransform bodyTransform;
+        bodyTransform.setIdentity();
+
+        float mass = 70.0;
+        btVector3 localInertia(0, 0, 0);
+        bodyShape->calculateLocalInertia(mass, localInertia);
+        localInertia *= 0.1f;
+
+        btDefaultMotionState* motionState = new btDefaultMotionState(bodyTransform);
+
+        bodyShape->setMargin(0.001);
+
+        btRigidBody* meshBody = new btRigidBody(
+            btRigidBody::btRigidBodyConstructionInfo(
+                mass, motionState, bodyShape, localInertia
+            )
+        );
+
+        meshBody->setFriction(2.0f);
+        meshBody->setRestitution(0.0f);
+        meshBody->setAngularFactor(btVector3(0,0,0));
+
+        rigidBody = meshBody;
     }
 };

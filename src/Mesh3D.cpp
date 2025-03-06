@@ -84,7 +84,8 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 }
 
 void Mesh3D::loadModel(const char* filename) {
-    Assets::loadModel(filename, m_vertices, m_indices);
+    Assets::loadModel(filename, m_vertices, m_indices, AA, BB);
+    printf("Model %s Range: %f %f %f -> %f %f %f\n", filename, AA.x, AA.y, AA.z, BB.x, BB.y, BB.z);
     updateModelMatrix();
     
     createVertexBuffer();
@@ -95,9 +96,8 @@ extern std::vector<Texture> textures;
 
 void Mesh3D::updateModelMatrix() {
     glm::mat4 matrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0));
-    matrix = glm::translate(matrix, position);
-    matrix *= glm::toMat4(rotationB);
-    
+    matrix = glm::translate(matrix, position * glm::vec3(WORLD_SCALE));
+    matrix *= glm::toMat4(orientation);
     modelMatrix = matrix;
 }
 
@@ -116,4 +116,79 @@ ModelBufferObject Mesh3D::getModelMatrix() {
 void Mesh3D::updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
     ModelBufferObject buffer = getModelMatrix();
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &buffer);
+}
+
+void Mesh3D::createRigidBody(float mass, ColliderType colliderType, float colliderPercent) {
+    glm::vec3 size = glm::vec3(abs(BB.x - AA.x), abs(BB.y - AA.y), abs(BB.z - AA.z));
+
+    btCollisionShape *collisionShape = nullptr;
+
+    hasPhysics = true;
+
+    if (colliderType == ColliderType::BOX) {
+        collisionShape = new btCompoundShape();
+        btBoxShape *child = new btBoxShape(btVector3(size.x / 2.0, size.y / 2.0, size.z / 2.0));
+
+        btTransform localTransform;
+        localTransform.setIdentity();
+        localTransform.setOrigin(btVector3(0.0, -size.z, 0.0));
+        ((btCompoundShape*)collisionShape)->addChildShape(localTransform, child);
+    } else if (colliderType == ColliderType::CONVEXHULL) {
+        collisionShape = new btConvexHullShape();
+        float triangleCount = m_indices.size() / 3;
+
+        // 33% of vertices: optimization, triangulated mesh, every 3 vertices are close, so only use every third vertex
+        // double 3 to 6 because we skip every other triangle,
+        // since they are often right next to eachother and can be removed from the convex hull
+
+        for (int i = 0; i < m_indices.size(); i += 6) {
+            glm::vec3 pnt = m_vertices[m_indices[ i ]].pos;
+            ((btConvexHullShape *)collisionShape)->addPoint(btVector3(pnt.x, pnt.y, pnt.z), true);
+        }
+        ((btConvexHullShape *)collisionShape)->optimizeConvexHull();
+    } else { // static triangle mesh
+        btTriangleMesh *mesh = new btTriangleMesh();
+        for (int i = 0; i < m_indices.size(); i += 3) {
+            glm::vec3 pntA = m_vertices[m_indices[ i ]].pos;
+            glm::vec3 pntB = m_vertices[m_indices[ i+1 ]].pos;
+            glm::vec3 pntC = m_vertices[m_indices[ i+2 ]].pos;
+
+            mesh->addTriangle(
+                btVector3(pntA.x, pntA.y, pntA.z),
+                btVector3(pntB.x, pntB.y, pntB.z),
+                btVector3(pntC.x, pntC.y, pntC.z)
+            );
+            mesh->addTriangleIndices(0, 1, 2);
+        }
+        collisionShape = new btBvhTriangleMeshShape(mesh, true);
+
+    }
+
+    btTransform bodyTransform;
+    bodyTransform.setIdentity();
+    bodyTransform.setOrigin(btVector3(position.x, position.y, position.z));
+    bodyTransform.setRotation(btQuaternion(orientation.x, orientation.y, orientation.z, orientation.w));
+
+    btVector3 localInertia(0, 0, 0);
+    collisionShape->calculateLocalInertia(mass, localInertia);
+    printf("Body Inertia: %f %f %f\n", localInertia.getX(), localInertia.getY(), localInertia.getZ());
+
+    btDefaultMotionState* motionState = new btDefaultMotionState(bodyTransform);
+
+    collisionShape->setMargin(0.001);
+
+    rigidBody = new btRigidBody(
+        btRigidBody::btRigidBodyConstructionInfo(
+            mass, motionState, collisionShape, localInertia
+        )
+    );
+}
+
+void Mesh3D::loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
+    this->m_vertices = m_vertices;
+    this->m_indices = m_indices;
+    updateModelMatrix();
+    
+    createVertexBuffer();
+    createIndexBuffer();
 }

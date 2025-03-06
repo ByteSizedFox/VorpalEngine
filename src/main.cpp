@@ -45,19 +45,10 @@
 class Application {
 public:
     void run() {
-        Logger::info("Initializing Window...");
         window.init(800, 600);
-        Logger::success("Initialized Window");
-        Logger::info("Initializing Vulkan...");
         initVulkan();
-        Logger::success("Initialized Vulkan");
-        Logger::info("Initializing ImGUI...");
         initImGui();
-        Logger::success("Initialized ImGUI");
-        Logger::info("Initializing MainLoop...");
-
         mainLoop();
-        Logger::info("Exiting Application...");
         cleanup();
     }
 
@@ -118,6 +109,7 @@ private:
     Scene mainScene;
     Mesh3D mesh;
     Mesh3D mesh1;
+    Mesh3D meshFloor;
     Mesh3D uiMesh;
 
     void ImGuiTheme() {
@@ -194,33 +186,40 @@ private:
 
         createTextureSampler();
 
-        // we need UImesh immediately
-        Logger::info("Initializing uiMesh...");
-        uiMesh.init("assets/models/Cube_B.glb");
-        uiMesh.loadModel(uiMesh.fileName.c_str());
-        Logger::success("Initialized uiMesh");
+        // we need UImesh globally
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+        Utils::createUIMesh( (float)UI_WIDTH / (float)UI_HEIGHT, vertices, indices);
+        uiMesh.loadRaw(vertices, indices);
 
-        Logger::info("Initializing mesh...");
-        mesh.init("assets/models/testbox.glb");
-        Logger::success("Initialized mesh");
+        // load models
+        mesh.init("assets/models/male_07_test.glb");
+        mesh.setRotation({0.0, glm::radians(0.0), glm::radians(180.0)});
+        mesh.setPosition({0.01, 1.5, 0.01});
 
-        Logger::info("Initializing mesh1...");
         mesh1.init("assets/models/flatgrass_lowdef.glb");
-        Logger::success("Initialized mesh1");
-
-        mesh.setRotation({0.0, glm::radians(45.0), glm::radians(45.0)});
-        mesh.setPosition({0.01,0.5,0.01});
-
-        physManager = new Physics::PhysicsManager(&mesh, &window.camera);
+        
+        meshFloor.init("assets/models/floor.glb");
+        meshFloor.setRotation({0.0, 0.0, 0.0});
+        meshFloor.setPosition({0.0, -1.5, 0.0});
         
         mainScene.add_object(&mesh);
         mainScene.add_object(&mesh1);
+        //mainScene.add_object(&meshFloor);
 
         printf("Descriptorset Layout Init\n");
         descriptorSetLayout = createDescriptorSetLayout(false);
 
         printf("Pipeline Init\n");
         pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv");
+
+        mainScene.init();
+
+        mesh1.setPosition({0.0,0.0,0.0});
+        mesh1.setRotation({0.0,0.0,0.0});
+        mesh1.createRigidBody(0.0, ColliderType::TRIMESH, 0.5);
+
+        physManager = new Physics::PhysicsManager(&mesh, &window.camera, &mesh1);
 
         printf("DescriptorPool Init\n");
         createDescriptorPool();        
@@ -306,6 +305,7 @@ private:
 
         mesh.destroy();
         mesh1.destroy();
+        meshFloor.destroy();
         uiMesh.destroy();
         
         vkDestroySampler(VK::device, textureSampler, nullptr);
@@ -470,6 +470,7 @@ private:
         deviceFeatures.samplerAnisotropy = VK_TRUE;
 
         VkPhysicalDeviceVulkan12Features features {};
+
         //memset(&features, false, sizeof(VkPhysicalDeviceVulkan12Features));
         //features.pNext = nullptr;
         //features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -694,7 +695,7 @@ private:
 
     void setupUI() {
         
-        Image::createImage(320, 180, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
+        Image::createImage(UI_WIDTH, UI_HEIGHT, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
         uiTextureView = Image::createImageView(uiTexture, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 
 #ifdef ENABLE_MULTISAMPLE
@@ -713,8 +714,8 @@ private:
         framebufferInfo.renderPass = uiRenderPass;
         framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = 320;
-        framebufferInfo.height = 180;
+        framebufferInfo.width = UI_WIDTH;
+        framebufferInfo.height = UI_HEIGHT;
         framebufferInfo.layers = 1;
 
         if (vkCreateFramebuffer(VK::device, &framebufferInfo, nullptr, &uiFramebuffer) != VK_SUCCESS) {
@@ -1075,15 +1076,23 @@ private:
     int incr = 0;
     bool enablePopup = false;
     void drawUI() {
-        ImGui::SetNextWindowSize(ImVec2(320, 180));
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(VK::physicalDevice, &properties);
+        
+        ImGui::SetNextWindowSize(ImVec2(UI_WIDTH, UI_HEIGHT));
         ImGui::SetNextWindowPos(ImVec2(0,0));
         
         if (window_open) {
-            ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
+            ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
             ImGui::Text("FPS: %i", fps);
             glm::vec3 pos = window.getCamera()->getPosition();
             ImGui::Text("XYZ:\n%f \n%f \n%f", pos.x, pos.y, pos.z);
             ImGui::Text("Press Escape To Exit");
+            ImGui::Text("Device Info:");
+            ImGui::Text("GPU VendorID: 0x%04X", properties.vendorID);
+            ImGui::Text("GPU DeviceID: 0x%04X", properties.deviceID);
+            ImGui::Text("GPU Name: %s", properties.deviceName);
+            ImGui::Text("GPU Driver Version: %i", properties.driverVersion);
 
             if (ImGui::Button("Press Me!")) {
                 enablePopup = true;
@@ -1105,7 +1114,7 @@ private:
             renderPassInfo.renderPass = renderPass;
             renderPassInfo.framebuffer = frameBuffer;
             renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = {320, 180};
+            renderPassInfo.renderArea.extent = {UI_WIDTH, UI_HEIGHT};
             std::array<VkClearValue, 2> clearValues{};
             clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
             clearValues[1].depthStencil = {1.0f, 0};
@@ -1116,22 +1125,22 @@ private:
             vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
                     viewport.x = 0.0f;
                     viewport.y = 0.0f;
-                    viewport.width = (float) 320;
-                    viewport.height = (float) 180;
+                    viewport.width = (float) UI_WIDTH;
+                    viewport.height = (float) UI_HEIGHT;
                     viewport.minDepth = 0.0f;
                     viewport.maxDepth = 1.0f;
                 vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
                 scissor.offset = {0, 0};
                 scissor.extent = {
-                    320,
-                    180
+                    UI_WIDTH,
+                    UI_HEIGHT
                 };
                 vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
                 // draw imgui
                 ImGuiIO& io = ImGui::GetIO();
-                io.DisplaySize = ImVec2(320,180);
+                io.DisplaySize = ImVec2(UI_WIDTH, UI_HEIGHT);
 
                 ImGui_ImplVulkan_NewFrame();
                 ImGui::NewFrame();
@@ -1206,7 +1215,7 @@ private:
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
 
             if (mainScene.isReady) {
-                mainScene.draw(commandBuffer, pipelineLayout);
+                mainScene.draw(commandBuffer, pipelineLayout, &window);
             }
             if (window_open) {
                 uiMesh.draw(commandBuffer, pipelineLayout);
@@ -1493,7 +1502,7 @@ private:
             window_open = true;
 
             // 1. Position the object in front of the camera
-            float distance = 0.01f;
+            float distance = 1.0f;
 
             uiMesh.setPosition(camPos + -forward * distance);
             uiMesh.updateModelMatrix();
@@ -1503,10 +1512,10 @@ private:
             float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
 
             // 4. Set the rotation (assuming your rotation is in radians)
-            uiMesh.setRotation({yaw, 0.0, glm::radians(90.0f)});
+            uiMesh.setRotation({-pitch, yaw, glm::radians(0.0f)});
         }
 
-        float speed = 50.0f * deltaTime;
+        float speed = 5000.0f * deltaTime;
 
         if (window.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
             speed *= 2;
@@ -1525,11 +1534,13 @@ private:
         if (window.isKeyPressed(GLFW_KEY_D)) {
             camVec += glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
+
         
-        // up
-        if (window.isKeyPressed(GLFW_KEY_SPACE)) {
-            camVec.y += speed;
-        }
+            if (window.isKeyPressed(GLFW_KEY_SPACE)) { // jump
+                camVec.y += speed;
+            }
+        
+        
         if (window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
             camVec.y -= speed;
         }
@@ -1551,7 +1562,7 @@ private:
         // raycast to 
         glm::vec2 result;
         float distance;
-        bool hit = Experiment::raycastRectangle(camPos, -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getViewMatrix(), window.getProjectionMatrix(), distance, result);
+        bool hit = Experiment::raycastRectangle(camPos * glm::vec3(WORLD_SCALE), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getViewMatrix(), window.getProjectionMatrix(), distance, result);
         
         if (ImGui::GetCurrentContext() == nullptr) {
             return;
@@ -1559,7 +1570,7 @@ private:
         ImGuiIO& io = ImGui::GetIO();
         if (distance <= 1.0 && hit) {
             uiNeedsUpdate = true;
-            io.AddMousePosEvent(result.x * 320.0f, result.y * 180.0f);
+            io.AddMousePosEvent(result.x * UI_WIDTH, result.y * UI_HEIGHT);
         } else {
             io.AddMousePosEvent(999.0, 999.0);
         }

@@ -8,6 +8,8 @@
 #include "Mesh3D.hpp"
 #include "imgui.h"
 #include "backends/imgui_impl_vulkan.h"
+#include "Window.hpp"
+#include "FrustumCull.h"
 
 class Scene {
 private:
@@ -47,10 +49,25 @@ public:
         meshes.push_back(mesh);
     }
     
-    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
+    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, Window *window) {
+        Frustum frustum(window->getProjectionMatrix() * window->camera.getViewMatrix());
+
+        int c = 0;
         for (Mesh3D *mesh : meshes) {
-            mesh->draw(commandBuffer, pipelineLayout);
+            glm::mat4 mat = mesh->getModelMatrix().model;
+
+            btVector3 AA;
+            btVector3 BB;
+            mesh->rigidBody->getAabb(AA, BB);
+            glm::vec3 min = glm::vec3(AA.getX(), AA.getY(), AA.getZ()) / glm::vec3(100.0);
+            glm::vec3 max = glm::vec3(BB.getX(), BB.getY(), BB.getZ()) / glm::vec3(100.0);
+
+            if (frustum.IsBoxVisible(min, max)) {
+                mesh->draw(commandBuffer, pipelineLayout);
+                c++;
+            }
         }
+        //printf("Displaying: %i/%i\n", c, meshes.size());
     }
 
     void drawUI() {
