@@ -4,86 +4,58 @@
 #include "LinearMath/btAlignedObjectArray.h"
 
 #include <iostream>
+#include <memory>
 
 // engine includes
 #include "Mesh3D.hpp"
 #include "Camera.hpp"
+#include "DebugMesh.hpp"
+
+inline btVector3 worldToPhysics(glm::vec3 pos) {
+    return btVector3(pos.x, pos.y, pos.z);
+}
+inline glm::vec3 physicsToWorld(btVector3 pos) {
+    return glm::vec3(pos.getX(),pos.getY(),pos.getZ()) / glm::vec3(1.0);
+}
+
+struct BulletContactResultCallback : public btCollisionWorld::ContactResultCallback {
+public:
+    bool triggered = false;
+
+    bool needsCollision(btBroadphaseProxy* proxy0) const override {
+        return true;
+    }
+
+    btScalar addSingleResult(btManifoldPoint &cp, const btCollisionObjectWrapper *colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper *colObj1Wrap, int partId1, int index1) override {
+        if (colObj0Wrap->getCollisionObject() == colObj1Wrap->getCollisionObject()) {
+            return 0;
+        }
+
+        btVector3 ptA = cp.getPositionWorldOnA();
+        btVector3 ptB = cp.getPositionWorldOnB();
+        double distance = cp.getDistance();
+
+        triggered = true;
+        
+        return 0;
+    }
+};
 
 namespace Physics {
     class PhysicsManager {
-        Mesh3D *mesh;
-        Mesh3D *meshFloor;
+        std::vector<Mesh3D*> meshes;
         Camera *camera;
 
         std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;
         std::unique_ptr<btCollisionDispatcher> dispatcher;
         std::unique_ptr<btBroadphaseInterface> overlappingPairCache;
         std::unique_ptr<btSequentialImpulseConstraintSolver> solver;
-        std::unique_ptr<btDiscreteDynamicsWorld> dynamicsWorld;
-
-        btRigidBody* floor;
-        btRigidBody* body;
-        btRigidBody* cameraBody;
-        btRigidBody* meshFloorBody;
         
     public:
-        btVector3 worldToPhysics(glm::vec3 pos) {
-            return btVector3(pos.x, pos.y, pos.z);
-        }
-        glm::vec3 physicsToWorld(btVector3 pos) {
-            return glm::vec3(pos.getX(),pos.getY(),pos.getZ()) / glm::vec3(1.0);
-        }
+        // need public access to draw in render loop
+        MyDebugDrawer* debugDrawer = nullptr;
+        std::shared_ptr<btDiscreteDynamicsWorld> dynamicsWorld;
 
-        btRigidBody* createGroundPlane() {
-            btCollisionShape* groundShape = new btBoxShape(btVector3(10000, 1, 10000));
-
-            btTransform groundTransform;
-            groundTransform.setIdentity();
-            groundTransform.setOrigin(btVector3(0.0, -2.0, 0.0));
-
-            btVector3 localInertia(0, 0, 0);
-            groundShape->calculateLocalInertia(0.0, localInertia);
-            btRigidBody* groundBody = new btRigidBody(
-                btRigidBody::btRigidBodyConstructionInfo(
-                    0, new btDefaultMotionState(groundTransform), groundShape, localInertia
-                )
-            );
-            groundBody->setActivationState(DISABLE_DEACTIVATION);
-            groundBody->setFriction(1.0f);
-            groundBody->setRestitution(0.0f);
-            
-            dynamicsWorld->addRigidBody(groundBody);
-            return groundBody;
-        }
-        btRigidBody* createMeshFloorBody() {
-            glm::vec3 size = glm::vec3(abs(meshFloor->BB.x - meshFloor->AA.x), abs(meshFloor->BB.y - meshFloor->AA.y), abs(meshFloor->BB.z - meshFloor->AA.z));
-
-            printf("Floor Size: %f %f %f\n", size.x, size.y, size.z);
-            btCollisionShape* bodyShape = new btBoxShape(btVector3(size.x / 2.0, size.y / 2.0, size.z / 2.0));
-            btTransform bodyTransform;
-            bodyTransform.setIdentity();
-            glm::vec3 pos = meshFloor->getPosition();
-            bodyTransform.setOrigin(btVector3(pos.x, pos.y, pos.z));
-            bodyTransform.setRotation(btQuaternion(meshFloor->getOrientation().x, meshFloor->getOrientation().y, meshFloor->getOrientation().z, meshFloor->getOrientation().w));
-
-            printf("Size Floor: %f %f %f, pos: %f %f %f\n", size.x, size.y, size.z, pos.x, pos.y, pos.z);
-
-            float mass = 0.0;
-            btVector3 localInertia(0, 0, 0);
-            bodyShape->calculateLocalInertia(mass, localInertia);
-            btDefaultMotionState* motionState = new btDefaultMotionState(bodyTransform);
-
-            bodyShape->setMargin(0.001);
-
-            btRigidBody* meshBody = new btRigidBody(
-                btRigidBody::btRigidBodyConstructionInfo(
-                    mass, motionState, bodyShape, localInertia
-                )
-            );
-
-            dynamicsWorld->addRigidBody(meshBody);
-            return meshBody;
-        }
         void init() {
             collisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
             dispatcher = std::make_unique<btCollisionDispatcher>(collisionConfiguration.get());
@@ -91,37 +63,38 @@ namespace Physics {
             solver = std::make_unique<btSequentialImpulseConstraintSolver>();
 
             // Create dynamics world
-            dynamicsWorld = std::make_unique<btDiscreteDynamicsWorld>(
+            dynamicsWorld = std::make_shared<btDiscreteDynamicsWorld> (
                 dispatcher.get(), 
                 overlappingPairCache.get(), 
                 solver.get(), 
                 collisionConfiguration.get()
             );
 
+            // load debug renderer
+#ifdef DRAW_DEBUG
+            debugDrawer = new MyDebugDrawer();
+            dynamicsWorld->setDebugDrawer(debugDrawer);
+#endif
+
             // Set gravity
             dynamicsWorld->setGravity(btVector3(0, -9.81f, 0));
 
-            mesh->createRigidBody(10.0, ColliderType::CONVEXHULL, 0.25);
-            body = mesh->rigidBody;
-            body->setActivationState(DISABLE_DEACTIVATION);
-            body->setFriction(2.0f);
-            dynamicsWorld->addRigidBody(body);
-
-            cameraBody = camera->rigidBody;// createCameraBody();
-            cameraBody->setActivationState(DISABLE_DEACTIVATION);
-            //cameraBody->setDamping(0.95f, 0.0f);
-            dynamicsWorld->addRigidBody(cameraBody);
-
-            meshFloorBody = meshFloor->rigidBody; // createMeshFloorBody();
-            meshFloorBody->setActivationState(DISABLE_DEACTIVATION);
-            meshFloorBody->setFriction(2.0f);
-            dynamicsWorld->addRigidBody(meshFloorBody);
+            for (Mesh3D *mesh : meshes) {
+                if (!mesh->hasPhysics) { // skip non-physics meshes
+                    continue;
+                }
+                mesh->rigidBody->setActivationState(DISABLE_DEACTIVATION);
+                mesh->rigidBody->setFriction(2.0f);
+                dynamicsWorld->addRigidBody(mesh->rigidBody);
+            }
+            
+            camera->rigidBody->setActivationState(DISABLE_DEACTIVATION);
+            dynamicsWorld->addRigidBody(camera->rigidBody);
         }
 
-        PhysicsManager(Mesh3D *mesh, Camera *camera, Mesh3D *meshFloor) {
-            this->mesh = mesh;
+        PhysicsManager(std::vector<Mesh3D *> &meshes, Camera *camera) {
+            this->meshes = meshes;
             this->camera = camera;
-            this->meshFloor = meshFloor;
             init();
         }
 
@@ -145,16 +118,22 @@ namespace Physics {
         void process(float deltaTime) {
             dynamicsWorld->stepSimulation(deltaTime, 1.0);
 
-            cameraBody->applyCentralImpulse(worldToPhysics(camera->getVelocity()));
-            camera->resetVelocity();
+            // draw debug
+#ifdef DRAW_DEBUG
+            dynamicsWorld->debugDrawWorld();
+#endif
 
-            camera->setPosition(physicsToWorld(cameraBody->getInterpolationWorldTransform().getOrigin()));
-            syncMesh(mesh, body);
-            syncMesh(meshFloor, meshFloorBody);
-            
+            //float velY = camera->rigidBody->getLinearVelocity().getY();
+            //camera->rigidBody->setLinearVelocity(worldToPhysics(camera->getVelocity()) + btVector3(0.0, velY, 0.0));
+            //camera->resetVelocity();
 
-            glm::vec3 pos = physicsToWorld(meshFloorBody->getWorldTransform().getOrigin());
-            //printf("Position Floor: %f %f %f\n", pos.x, pos.y, pos.z);
+            camera->setPosition(physicsToWorld(camera->rigidBody->getInterpolationWorldTransform().getOrigin()) + glm::vec3(0.0, 0.5, 0.0));
+            for (Mesh3D* mesh : meshes) {
+                if (!mesh->hasPhysics) { // skip non-physics meshes
+                    continue;
+                }
+                syncMesh(mesh, mesh->rigidBody);
+            }
         }
     };
 }

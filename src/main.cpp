@@ -193,19 +193,28 @@ private:
         uiMesh.loadRaw(vertices, indices);
 
         // load models
-        mesh.init("assets/models/male_07_test.glb");
+        mesh.init("assets/models/male_07.glb");
         mesh.setRotation({0.0, glm::radians(0.0), glm::radians(180.0)});
-        mesh.setPosition({0.01, 1.5, 0.01});
+        mesh.setPosition({0.01, -2.0, 0.01});
+        mesh.createRigidBody(50.0, ColliderType::CONVEXHULL);
 
-        mesh1.init("assets/models/flatgrass_lowdef.glb");
-        
-        meshFloor.init("assets/models/floor.glb");
+        mesh1.init("assets/models/flatgrass.glb");
+        mesh1.setPosition({0.0, -5.0, 0.0});
+        mesh1.setRotation({0.0,0.0,0.0});
+        mesh1.createRigidBody(0.0, ColliderType::TRIMESH);
+
+        //meshFloor.init("assets/models/floor.glb");
         meshFloor.setRotation({0.0, 0.0, 0.0});
         meshFloor.setPosition({0.0, -1.5, 0.0});
+        std::vector<Vertex> vertices1;
+        std::vector<uint32_t> indices1;
+        Utils::createGroundPlaneMesh( 200.0f, 200, vertices1, indices1);
+        meshFloor.loadRaw(vertices1, indices1);
+        meshFloor.createRigidBody(0.0, ColliderType::TRIMESH);
         
         mainScene.add_object(&mesh);
         mainScene.add_object(&mesh1);
-        //mainScene.add_object(&meshFloor);
+        mainScene.add_object(&meshFloor);
 
         printf("Descriptorset Layout Init\n");
         descriptorSetLayout = createDescriptorSetLayout(false);
@@ -215,11 +224,9 @@ private:
 
         mainScene.init();
 
-        mesh1.setPosition({0.0,0.0,0.0});
-        mesh1.setRotation({0.0,0.0,0.0});
-        mesh1.createRigidBody(0.0, ColliderType::TRIMESH, 0.5);
+        
 
-        physManager = new Physics::PhysicsManager(&mesh, &window.camera, &mesh1);
+        physManager = new Physics::PhysicsManager(mainScene.meshes, &window.camera);
 
         printf("DescriptorPool Init\n");
         createDescriptorPool();        
@@ -236,7 +243,6 @@ private:
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             updateUniformBuffer(i);
         }
-
     }
 
     double last_time = 0;
@@ -252,7 +258,14 @@ private:
             frames++;
 
             glfwPollEvents();
+
             drawFrame();
+
+            // move camera
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                updateUniformBuffer(i);
+            }
+            handle_input();
 
             if (now - last_time >= 1.0) {
                 fps = frames;
@@ -307,6 +320,10 @@ private:
         mesh1.destroy();
         meshFloor.destroy();
         uiMesh.destroy();
+
+#ifdef DRAW_DEBUG
+        debugMesh.destroy();
+#endif
         
         vkDestroySampler(VK::device, textureSampler, nullptr);
 
@@ -1086,7 +1103,7 @@ private:
             ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
             ImGui::Text("FPS: %i", fps);
             glm::vec3 pos = window.getCamera()->getPosition();
-            ImGui::Text("XYZ:\n%f \n%f \n%f", pos.x, pos.y, pos.z);
+            ImGui::Text("XYZ: %.2f %.2f %.2f", pos.x, pos.y, pos.z);
             ImGui::Text("Press Escape To Exit");
             ImGui::Text("Device Info:");
             ImGui::Text("GPU VendorID: 0x%04X", properties.vendorID);
@@ -1158,8 +1175,6 @@ private:
         Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
     }
 
-    
-
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1211,6 +1226,10 @@ private:
         
             uiMesh.isUI = true;
 
+#ifdef DRAW_DEBUG
+            prepareDebugMesh();
+#endif
+
             // temporary: use only the first model descriptorsets
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
 
@@ -1220,6 +1239,13 @@ private:
             if (window_open) {
                 uiMesh.draw(commandBuffer, pipelineLayout);
             }
+
+#ifdef DRAW_DEBUG
+            if (debugMesh.m_indices.size() != 0) {
+                debugMesh.draw(commandBuffer, pipelineLayout);
+                physManager->debugDrawer->clear();
+            }
+#endif
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -1251,8 +1277,34 @@ private:
         }
     }
 
-    void drawFrame() {
+    Mesh3D debugMesh;
+    void prepareDebugMesh() {
+        if (debugMesh.m_indices.size() != 0) {
+            debugMesh.destroy();
+        }
 
+        MyDebugDrawer *debugDrawer = physManager->debugDrawer;
+        const std::vector<btVector3>& vertices = debugDrawer->getVertices();
+        const std::vector<btVector3>& colors = debugDrawer->getColors();
+        const std::vector<int>& indices = debugDrawer->getIndices();
+
+        std::vector<Vertex> rawVertices(vertices.size());
+        std::vector<uint32_t> rawIndices(indices.size());
+        for (int i = 0; i < indices.size(); i++) {
+            btVector3 vert = vertices[indices[i]];
+            btVector3 color = colors[indices[i]];
+            rawVertices[indices[i]].pos = glm::vec3(vert.getX(), vert.getY(), vert.getZ());
+            rawVertices[indices[i]].color = glm::vec3(color.getX(), color.getY(), color.getZ());
+            rawIndices[i] = indices[i];
+        }
+        
+        debugMesh.loadRaw(rawVertices, rawIndices);
+        debugMesh.setPosition({0.0,0.0,0.0});
+        debugMesh.setRotation({0.0,0.0,0.0});
+        debugMesh.isDebug = true;
+    }
+
+    void drawFrame() {
         vkWaitForFences(VK::device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
@@ -1303,11 +1355,6 @@ private:
 
         result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
-        // move camera
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            updateUniformBuffer(i);
-        }
-
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window.wasResized()) {
             window.clearResized();
             window.updateProjectionMatrix(swapChainExtent.width, swapChainExtent.height);
@@ -1328,6 +1375,8 @@ private:
             mainScene.init();
             Logger::success("Loaded Main Scene");
         }
+
+        //physThread.join();
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -1481,65 +1530,63 @@ private:
     }
 
     double last_deltatime = glfwGetTime();
+    double deltaTime = 0.0;
+    BulletContactResultCallback callback;
 
     void handle_input() {
         double time = glfwGetTime();
-        double deltaTime = time - last_deltatime;
+        deltaTime = time - last_deltatime;
         last_deltatime = time;
 
         physManager->process(deltaTime);
 
-        //glm::vec2 camRot = window.getCamera()->getRotation();
-        glm::vec3 camPos = window.getCamera()->getPosition();
+        // handle mouse input
+        glm::vec2 mouseVec = window.getMouseVector();
+        window.camera.pitch(-mouseVec.y * 0.001);
+        window.camera.yaw(mouseVec.x * 0.001);
 
-        //glm::vec2 mouseVec = window.getMouseVector();
-        //camRot += (mouseVec * glm::vec2(-0.001f, 0.001f));
-        //camRot.y = glm::clamp(camRot.y, glm::radians(-75.0f), glm::radians(75.0f));
+        // handle user input
+        glm::vec3 camPos = physicsToWorld(window.getCamera()->rigidBody->getInterpolationWorldTransform().getOrigin()) + glm::vec3(0.0, 0.5, 0.0);
 
         const glm::vec3 forward = window.getCamera()->getForward();
 
-        if (window.isKeyPressed(GLFW_KEY_E)) {
-            window_open = true;
-
-            // 1. Position the object in front of the camera
-            float distance = 1.0f;
-
-            uiMesh.setPosition(camPos + -forward * distance);
-            uiMesh.updateModelMatrix();
-
-            glm::vec3 objectToCamera = (camPos) - uiMesh.getPosition();
-            float yaw = std::atan2(objectToCamera.x, objectToCamera.z);
-            float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
-
-            // 4. Set the rotation (assuming your rotation is in radians)
-            uiMesh.setRotation({-pitch, yaw, glm::radians(0.0f)});
-        }
-
-        float speed = 5000.0f * deltaTime;
-
+        // avg walk speed
+        float speed = 142.0f * deltaTime;
         if (window.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
-            speed *= 2;
+            speed = 250.0 * deltaTime;
         }
+        speed *= 2.0; // realistic walking speed too slow
 
         glm::vec3 camVec = glm::vec3(0.0);
+
+        glm::vec3 vel = glm::vec3(0.0);
         if (window.isKeyPressed(GLFW_KEY_W)) {
-            camVec += glm::normalize(glm::vec3(-forward.x, 0.0f, -forward.z)) * glm::vec3(speed);
+            vel += glm::normalize(glm::vec3(-forward.x, 0.0f, -forward.z)) * glm::vec3(speed);
         }
         if (window.isKeyPressed(GLFW_KEY_S)) {
-            camVec -= glm::normalize(glm::vec3(-forward.x, 0.0f, -forward.z)) * glm::vec3(speed);
+            vel -= glm::normalize(glm::vec3(-forward.x, 0.0f, -forward.z)) * glm::vec3(speed);
         }
         if (window.isKeyPressed(GLFW_KEY_A)) {
-            camVec -= glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
+            vel -= glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
         if (window.isKeyPressed(GLFW_KEY_D)) {
-            camVec += glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
+            vel += glm::cross(-forward, glm::vec3(0.0,1.0,0.0)) * glm::vec3(speed);
         }
+        window.camera.rigidBody->setLinearVelocity(btVector3(vel.x, window.camera.getVelY(), vel.z));
 
+        // 1ft
+        float jump_height = 3.048f;
         
-            if (window.isKeyPressed(GLFW_KEY_SPACE)) { // jump
-                camVec.y += speed;
+        physManager->dynamicsWorld->contactPairTest(window.camera.rigidBody, mesh1.rigidBody, callback);
+
+        // ground test
+        window.camera.isGrounded(physManager->dynamicsWorld);
+        if (window.isKeyPressed(GLFW_KEY_SPACE) && callback.triggered) { // jump
+            if (window.camera.grounded) {
+                window.camera.rigidBody->setLinearVelocity(btVector3(window.camera.getVelX(), jump_height,  window.camera.getVelZ()));
             }
-        
+            callback.triggered = false;
+        }
         
         if (window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
             camVec.y -= speed;
@@ -1561,26 +1608,49 @@ private:
 
         // raycast to 
         glm::vec2 result;
-        float distance;
-        bool hit = Experiment::raycastRectangle(camPos * glm::vec3(WORLD_SCALE), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getViewMatrix(), window.getProjectionMatrix(), distance, result);
-        
-        if (ImGui::GetCurrentContext() == nullptr) {
-            return;
-        }
+        glm::vec3 worldResult;
+        float distance = 1.0f;
+        bool hit = Experiment::raycastRectangle(camPos * glm::vec3(WORLD_SCALE), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, window.getCamera()->getViewMatrix(), window.getProjectionMatrix(), distance, result, worldResult);
+
         ImGuiIO& io = ImGui::GetIO();
         if (distance <= 1.0 && hit) {
             uiNeedsUpdate = true;
             io.AddMousePosEvent(result.x * UI_WIDTH, result.y * UI_HEIGHT);
+            io.MouseDrawCursor = true;
         } else {
+            if (io.MouseDrawCursor == true) {
+                uiNeedsUpdate = true; // update UI to hide cursor
+            }
             io.AddMousePosEvent(999.0, 999.0);
+            io.MouseDrawCursor = false;
         }
-        io.MouseDrawCursor = true;
+
+        if (window.isKeyPressed(GLFW_KEY_E)) {
+            // dont use cursor when dragging
+            io.MouseDrawCursor = false;
+            io.AddMousePosEvent(999.0, 999.0);
+
+            // get location in front of camera
+            float distance = 1.0f;
+            uiMesh.setPosition(camPos + -forward * distance);
+            glm::vec3 objectToCamera = camPos - uiMesh.getPosition();
+
+            // billboard rotation for the UI to the camera
+            float yaw = std::atan2(objectToCamera.x, objectToCamera.z);
+            float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
+
+            // Set the rotation
+            uiMesh.setRotation({-pitch, yaw, glm::radians(0.0f)});
+            uiMesh.updateModelMatrix();
+        }
+        
+        if (ImGui::GetCurrentContext() == nullptr) {
+            return;
+        }
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
         UniformBufferObject ubo{};
-
-        handle_input();
 
         ubo.view = window.getCamera()->getViewMatrix();
         ubo.proj = window.getProjectionMatrix();

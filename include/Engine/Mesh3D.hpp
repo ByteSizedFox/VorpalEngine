@@ -32,12 +32,15 @@ public:
     std::vector<Vertex> m_vertices;
     std::vector<uint32_t> m_indices;
 
+    glm::vec3 modelCenter;
+
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
 
     bool isUI = false;
+    bool isDebug = false;
 
     Mesh3D() {
 
@@ -54,5 +57,5 @@ public:
     void updateModelMatrix();
     void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
     void updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
-    void createRigidBody(float mass, ColliderType colliderType, float colliderPercent);
+    void createRigidBody(float mass, ColliderType colliderType);
 };

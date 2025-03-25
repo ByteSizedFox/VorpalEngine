@@ -13,17 +13,17 @@
 
 class Scene {
 private:
-    std::vector<Mesh3D*> meshes;
     std::thread loadThread;
 public:
     std::vector<Texture> textures;
+    std::vector<Mesh3D*> meshes;
 
     bool isReady = false;
 
     void init() {
-        for (Mesh3D *mesh : meshes) {
-            mesh->loadModel(mesh->fileName.c_str());
-        }
+        //for (Mesh3D *mesh : meshes) {
+        //    mesh->loadModel(mesh->fileName.c_str());
+        //}
         textures.resize(VK::textureMap.size());
         for (auto& tex: VK::textureMap) {
             textures[tex.second.textureID] = tex.second;
@@ -54,7 +54,10 @@ public:
 
         int c = 0;
         for (Mesh3D *mesh : meshes) {
-            glm::mat4 mat = mesh->getModelMatrix().model;
+            if (!mesh->hasPhysics) { // non physics-meshes dont have AABB, skip frustum culling
+                mesh->draw(commandBuffer, pipelineLayout);
+                continue;
+            }
 
             btVector3 AA;
             btVector3 BB;

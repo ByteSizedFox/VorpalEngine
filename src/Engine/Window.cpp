@@ -72,12 +72,6 @@ void Window::cursor_position_callback(GLFWwindow* window, double xpos, double yp
     }
 
     app->mouse_pos = {xpos, ypos};
-
-    // handle user input
-    glm::vec2 mouseVec = app->getMouseVector();
-    app->camera.pitch(-mouseVec.y * 0.001);
-    app->camera.yaw(mouseVec.x * 0.001);
-    
 }
 
 glm::vec2 Window::getMouseVector() {

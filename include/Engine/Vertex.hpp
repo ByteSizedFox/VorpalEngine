@@ -73,4 +73,5 @@ struct UniformBufferObject {
 struct ModelBufferObject {
     alignas(16) glm::mat4 model;
     alignas(16) bool isUI;
+    alignas(16) bool isDebug;
 };

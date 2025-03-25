@@ -21,6 +21,7 @@ void Mesh3D::init(const char *modelName) {
     m_vertices.reserve(100000);
     m_indices.reserve(100000);
     Logger::success("Reserved vertices & indices");
+    loadModel(modelName);
 }
 
 void Mesh3D::destroy() {
@@ -84,8 +85,10 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 }
 
 void Mesh3D::loadModel(const char* filename) {
-    Assets::loadModel(filename, m_vertices, m_indices, AA, BB);
+    
+    Assets::loadModel(filename, m_vertices, m_indices, AA, BB, modelCenter);
     printf("Model %s Range: %f %f %f -> %f %f %f\n", filename, AA.x, AA.y, AA.z, BB.x, BB.y, BB.z);
+    printf("Model Center: %f %f %f\n", modelCenter.x, modelCenter.y, modelCenter.z);
     updateModelMatrix();
     
     createVertexBuffer();
@@ -96,7 +99,7 @@ extern std::vector<Texture> textures;
 
 void Mesh3D::updateModelMatrix() {
     glm::mat4 matrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0));
-    matrix = glm::translate(matrix, position * glm::vec3(WORLD_SCALE));
+    matrix = glm::translate(matrix, (position) * glm::vec3(WORLD_SCALE));
     matrix *= glm::toMat4(orientation);
     modelMatrix = matrix;
 }
@@ -109,6 +112,7 @@ ModelBufferObject Mesh3D::getModelMatrix() {
     ModelBufferObject ubo{};
     ubo.model = modelMatrix;
     ubo.isUI = isUI;
+    ubo.isDebug = isDebug;
     // return the matrix to the GPU via push constants
     return ubo;
 }
@@ -118,7 +122,7 @@ void Mesh3D::updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &buffer);
 }
 
-void Mesh3D::createRigidBody(float mass, ColliderType colliderType, float colliderPercent) {
+void Mesh3D::createRigidBody(float mass, ColliderType colliderType) {
     glm::vec3 size = glm::vec3(abs(BB.x - AA.x), abs(BB.y - AA.y), abs(BB.z - AA.z));
 
     btCollisionShape *collisionShape = nullptr;
@@ -129,9 +133,12 @@ void Mesh3D::createRigidBody(float mass, ColliderType colliderType, float collid
         collisionShape = new btCompoundShape();
         btBoxShape *child = new btBoxShape(btVector3(size.x / 2.0, size.y / 2.0, size.z / 2.0));
 
+        glm::vec3 vertCenter = -modelCenter;
+        printf("Vertex Center: %f %f %f, Model Center: 0.0, 0.0, 0.0\n", vertCenter.x, vertCenter.y, vertCenter.z);
+
         btTransform localTransform;
         localTransform.setIdentity();
-        localTransform.setOrigin(btVector3(0.0, -size.z, 0.0));
+        //localTransform.setOrigin(btVector3(vertCenter.x, vertCenter.y, vertCenter.z));
         ((btCompoundShape*)collisionShape)->addChildShape(localTransform, child);
     } else if (colliderType == ColliderType::CONVEXHULL) {
         collisionShape = new btConvexHullShape();

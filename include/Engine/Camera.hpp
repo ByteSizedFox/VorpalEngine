@@ -9,6 +9,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+// std
+#include <memory>
+
 // physics
 #include "btBulletDynamicsCommon.h"
 #include "LinearMath/btVector3.h"
@@ -18,7 +21,7 @@
 
 class Camera {
 private:
-    glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 position = glm::vec3(0.0f, 10.0f, 0.0f);
     glm::quat orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
     glm::mat4 viewMatrix = glm::mat4(1.0f);
     glm::vec3 forward = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -27,11 +30,11 @@ private:
     glm::vec3 velocity = glm::vec3(0.0,0.0,0.0);
 
     bool isDirty = true;
-
 public:
     Camera() = default;
 
     btRigidBody* rigidBody;
+    bool grounded = true;
     
     // Getters
     glm::vec3 getPosition() const {
@@ -88,8 +91,13 @@ public:
     // Rotation methods
     void rotate(const glm::quat& rotation) {
         // Apply rotation to current orientation
-        orientation = rotation * orientation;
-        orientation = glm::normalize(orientation);
+        glm::quat new_orientation = rotation * orientation;
+        new_orientation = glm::normalize(new_orientation);
+
+        // clamp to right side up rotation
+        if (glm::rotate(new_orientation, glm::vec3(0.0f, 1.0f, 0.0f)).y > 0.0) {
+            orientation = new_orientation;
+        }
         isDirty = true;
     }
     
@@ -99,17 +107,29 @@ public:
         // Create quaternion from angle and transformed axis
         glm::quat rotation = glm::angleAxis(angle, glm::normalize(localAxis));
         // Apply rotation
-        orientation = rotation * orientation;
-        orientation = glm::normalize(orientation);
+        glm::quat new_orientation = rotation * orientation;
+        new_orientation = glm::normalize(new_orientation);
+
+        // clamp to right side up rotation
+        if (glm::rotate(new_orientation, glm::vec3(0.0f, 1.0f, 0.0f)).y > 0.0) {
+            orientation = new_orientation;
+        }
+
         isDirty = true;
     }
     
     void rotateGlobal(float angle, const glm::vec3& axis) {
         // Create quaternion from angle and axis
         glm::quat rotation = glm::angleAxis(angle, glm::normalize(axis));
+
         // Apply rotation
-        orientation = rotation * orientation;
-        orientation = glm::normalize(orientation);
+        glm::quat new_orientation = rotation * orientation;
+        new_orientation = glm::normalize(new_orientation);
+
+        // clamp to right side up rotation
+        if (glm::rotate(new_orientation, glm::vec3(0.0f, 1.0f, 0.0f)).y > 0.0) {
+            orientation = new_orientation;
+        }
         
         isDirty = true;
     }
@@ -163,7 +183,7 @@ public:
         forward = glm::rotate(orientation, glm::vec3(0.0f, 0.0f, 1.0f));
         right = glm::rotate(orientation, glm::vec3(1.0f, 0.0f, 0.0f));
         up = glm::rotate(orientation, glm::vec3(0.0f, 1.0f, 0.0f));
-        
+
         // Ensure they're normalized
         forward = glm::normalize(forward);
         right = glm::normalize(right);
@@ -205,6 +225,7 @@ public:
         btCollisionShape* bodyShape = new btCapsuleShape(0.5, 1.0);
         btTransform bodyTransform;
         bodyTransform.setIdentity();
+        bodyTransform.setOrigin(btVector3(position.x, position.y, position.z));
 
         float mass = 70.0;
         btVector3 localInertia(0, 0, 0);
@@ -221,10 +242,31 @@ public:
             )
         );
 
-        meshBody->setFriction(2.0f);
+        meshBody->setFriction(0.0f);
         meshBody->setRestitution(0.0f);
         meshBody->setAngularFactor(btVector3(0,0,0));
+        meshBody->setCollisionFlags(meshBody->getCollisionFlags() | btCollisionObject::CF_DISABLE_VISUALIZE_OBJECT);
 
         rigidBody = meshBody;
+    }
+    void isGrounded(std::shared_ptr<btDynamicsWorld> world) {
+        btVector3 from = rigidBody->getWorldTransform().getOrigin();
+        btVector3 to = from - btVector3(0, 1.0 + (1.0), 0);
+        
+        btCollisionWorld::ClosestRayResultCallback rayCallback(from, to);
+        
+        // Perform raycast
+        world->rayTest(from, to, rayCallback);
+
+        grounded = rayCallback.hasHit();
+    }
+    float getVelX() {
+        return rigidBody->getLinearVelocity().getX();
+    }
+    float getVelY() {
+        return rigidBody->getLinearVelocity().getY();
+    }
+    float getVelZ() {
+        return rigidBody->getLinearVelocity().getZ();
     }
 };

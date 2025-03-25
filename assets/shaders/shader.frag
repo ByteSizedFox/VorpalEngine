@@ -10,6 +10,7 @@ layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) flat in int f_textureID;
 layout(location = 3) flat in int f_isUI;
+layout(location = 4) flat in int f_isDebug;
 layout(location = 0) out vec4 outColor;
 
 void main() {
@@ -18,6 +19,8 @@ void main() {
 
     if (f_isUI == 1) {
         outColor = texture(sampler2D(uiTexture, samp), fragTexCoord);
+    } else if (f_isDebug == 1) {
+        outColor = vec4(fragColor, 1.0);
     } else {
         outColor = texture(sampler2D(textures[f_textureID], samp), fragTexCoord);
     }

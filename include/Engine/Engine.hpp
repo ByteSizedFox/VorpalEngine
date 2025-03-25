@@ -26,6 +26,10 @@
 
 #include "Engine/Engine.hpp"
 
+
+// for terrain
+#include "FastNoiseLite.h"
+
 namespace VK {
     inline VkDevice device;
     inline VkPhysicalDevice physicalDevice;
@@ -214,6 +218,68 @@ namespace Utils {
         m_vertices.push_back({glm::vec3( width, -height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(1.0, 1.0), 0});
         m_vertices.push_back({glm::vec3(-width, -height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 1.0), 0});
         m_vertices.push_back({glm::vec3(-width,  height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0), 0});
+    }
+
+    inline void createGroundPlaneMesh(float size, int subdivisions, std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
+        m_vertices.clear();
+        m_indices.clear();
+
+        FastNoiseLite noise;
+        noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+        
+        // Ensure we have at least 1 subdivision
+        subdivisions = std::max(1, subdivisions);
+        
+        // Calculate the size of each grid cell
+        float cellSize = size / subdivisions;
+        // Calculate the half size of the ground plane
+        float halfSize = size / 2.0f;
+        
+        // Generate vertices
+        for (int z = 0; z <= subdivisions; z++) {
+            for (int x = 0; x <= subdivisions; x++) {
+                // Calculate the position for this vertex
+                float xPos = -halfSize + x * cellSize;
+                float zPos = -halfSize + z * cellSize;
+                
+                // Calculate texture coordinates (UV)
+                float u = static_cast<float>(x) / subdivisions;
+                float v = static_cast<float>(z) / subdivisions;
+                
+                // Add vertex (y is 0 for a ground plane)
+                // Note: normal points upward
+                float s = noise.GetNoise((float)xPos, (float)zPos); //sin(sqrt( (xPos - (size/2)) * (zPos-(size/2))));
+                int texID = (int)abs(s * 8.0f * VK::g_texturePathList.size());
+                m_vertices.push_back({
+                    glm::vec3(xPos, s * 8.0f, zPos),      // Position
+                    glm::vec3(0.0f, 1.0f, 0.0f),      // Normal pointing up
+                    glm::vec2(u, v),                  // Texture coordinates
+                    texID                                 // Additional data (kept as 0 like in your example)
+                });
+            }
+        }
+        
+        // Generate indices for triangles
+        for (int z = 0; z < subdivisions; z++) {
+            for (int x = 0; x < subdivisions; x++) {
+                // Calculate the indices for the current quad
+                uint32_t topLeft = z * (subdivisions + 1) + x;
+                uint32_t topRight = topLeft + 1;
+                uint32_t bottomLeft = (z + 1) * (subdivisions + 1) + x;
+                uint32_t bottomRight = bottomLeft + 1;
+                
+                // Create two triangles for the quad
+                // Triangle 1 (top-left, bottom-left, bottom-right)
+                m_indices.push_back(topLeft);
+                m_indices.push_back(bottomLeft);
+                m_indices.push_back(bottomRight);
+                
+                // Triangle 2 (top-left, bottom-right, top-right)
+                m_indices.push_back(topLeft);
+                m_indices.push_back(bottomRight);
+                m_indices.push_back(topRight);
+            }
+        }
     }
 };
 
@@ -562,7 +628,8 @@ namespace Experiment {
         const glm::mat4& viewMatrix,
         const glm::mat4& projMatrix,
         float& distance,
-        glm::vec2& hitUV)
+        glm::vec2& hitUV,
+        glm::vec3& worldHit)
     {
         // Create the inverse transformation matrix to convert the ray to model space
         glm::mat4 inverseMatrix = glm::inverse(modelMatrix);
@@ -613,7 +680,8 @@ namespace Experiment {
                     
                     // Transform the intersection point back to world space
                     glm::vec4 worldSpaceIntersection = modelMatrix * glm::vec4(modelSpaceIntersection, 1.0f);
-                    
+                    worldHit = glm::vec3(worldSpaceIntersection) / glm::vec3(WORLD_SCALE);
+
                     // Interpolate the UV coordinates based on barycentric coordinates
                     hitUV = w * uv0 + u * uv1 + v * uv2;
                 return true;
@@ -625,7 +693,7 @@ namespace Experiment {
 };
 
 namespace Assets {
-    inline void loadModel(const char* filename, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices, glm::vec3 &AA, glm::vec3 &BB) {
+    inline void loadModel(const char* filename, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices, glm::vec3 &AA, glm::vec3 &BB, glm::vec3 &vertexCenter) {
         // Import the model with postprocessing steps to ensure triangulation and texture coordinates
         std::vector<char> model = std::move(Utils::readFileZip(filename));
         const aiScene* scene = Utils::importer.ReadFileFromMemory(model.data(), model.size(), aiProcess_Triangulate);
@@ -645,8 +713,6 @@ namespace Assets {
         // Process each mesh in the scene
         for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
             aiMesh* mesh = scene->mMeshes[i];
-
-            //printf("Loading mesh: %s\n", mesh->mName.C_Str());
             
             // Get material for this mesh
             aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
@@ -754,6 +820,8 @@ namespace Assets {
                         maxVec.z = vertex.pos.z;
                     }
 
+                    vertexCenter += vertex.pos;
+
                     // Texture coordinates (may be missing, but we check if valid)
                     if (mesh->mTextureCoords[0] && j != -1) {
                         vertex.texCoord = {
@@ -797,5 +865,13 @@ namespace Assets {
         BB.x = maxVec.x;
         BB.y = maxVec.y;
         BB.z = maxVec.z;
+
+        // center the model AABB
+        vertexCenter = glm::vec3( (AA.x + BB.x) / 2.0, (AA.y + BB.y) / 2.0, (AA.z + BB.z) / 2.0);
+        // center the mesh around 0,0
+        glm::vec3 offset = glm::vec3(abs(BB.x) - abs(AA.x), abs(BB.y) - abs(AA.y), abs(BB.z) - abs(AA.z));
+        for (int i = 0; i < vertices.size(); i++) {
+            vertices[i].pos -= vertexCenter;
+        }
     }
 };
