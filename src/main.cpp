@@ -58,13 +58,13 @@ int main() {
     const size_t size = _binary_a_bin_end - _binary_a_bin_start;
     Utils::initIOSystem(_binary_a_bin_start, size);
 
-    //try {
+    try {
         renderer.run();
         mainLoop();
         renderer.cleanup();
-    //} catch (const std::exception& e) {
-    //    std::cerr << e.what() << std::endl;
-    //    return EXIT_FAILURE;
-    //}
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
