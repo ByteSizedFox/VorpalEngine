@@ -22,6 +22,6 @@ void main() {
     } else if (f_isDebug == 1) {
         outColor = vec4(fragColor, 1.0);
     } else {
-        outColor = texture(sampler2D(textures[f_textureID], samp), fragTexCoord);
+        outColor = texture(sampler2D(textures[f_textureID], samp), fragTexCoord) * vec4(fragColor, 1.0);
     }
 }

@@ -36,7 +36,14 @@ void Mesh3D::createVertexBuffer() {
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
+
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    VkDebugUtilsObjectNameInfoEXT name_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
+    name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
+    name_info.objectHandle                  = (uint64_t) stagingBuffer;
+    name_info.pObjectName                   = "Staging Buffer";
+    vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
 
     void* data;
     vkMapMemory(VK::device, stagingBufferMemory, 0, bufferSize, 0, &data);
@@ -44,6 +51,10 @@ void Mesh3D::createVertexBuffer() {
     vkUnmapMemory(VK::device, stagingBufferMemory);
 
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+    name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
+    name_info.objectHandle                  = (uint64_t) vertexBuffer;
+    name_info.pObjectName                   = "Vertex Buffer";
+    vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
 
     Memory::copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
@@ -63,6 +74,12 @@ void Mesh3D::createIndexBuffer() {
     vkUnmapMemory(VK::device, stagingBufferMemory);
 
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+    VkDebugUtilsObjectNameInfoEXT name_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
+    name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
+    name_info.objectHandle                  = (uint64_t) indexBuffer;
+    name_info.pObjectName                   = "Index Buffer";
+    vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
 
     Memory::copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 

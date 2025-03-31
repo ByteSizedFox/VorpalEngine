@@ -43,8 +43,6 @@ void Window::init(int WIDTH, int HEIGHT) {
     // mouse and kb capture
     glfwSetKeyCallback(window, key_callback);
     memset(key_pressed, false, 1024);
-
-    camera.createRigidBody();
 }
 bool Window::ShouldClose() {
     return glfwWindowShouldClose(window);

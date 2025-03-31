@@ -11,24 +11,31 @@
 #include "Window.hpp"
 #include "FrustumCull.h"
 
+#include "Engine/PhysicsManager.hpp"
+#include "Engine/Camera.hpp"
+
 class Scene {
 private:
     std::thread loadThread;
 public:
-    std::vector<Texture> textures;
+    //std::vector<Texture> textures;
     std::vector<Mesh3D*> meshes;
+    Physics::PhysicsManager *physManager;
+    Camera camera;
 
     bool isReady = false;
+    virtual void setup() {
 
+    }
     void init() {
-        //for (Mesh3D *mesh : meshes) {
-        //    mesh->loadModel(mesh->fileName.c_str());
-        //}
-        textures.resize(VK::textureMap.size());
-        for (auto& tex: VK::textureMap) {
-            textures[tex.second.textureID] = tex.second;
-            printf("TextureID: %i\n", tex.second.textureID);
-        }
+        camera.createRigidBody();
+        camera.setPosition({0.0, 0.0, 0.0});
+        
+
+        setup();
+
+        physManager = new Physics::PhysicsManager(meshes, &camera);
+        
         isReady = true;
     }
     void loop() {
@@ -39,9 +46,8 @@ public:
     }
 
     void destroy() {
-        for (int i = 0; i < textures.size(); i++) {
-            Texture *texture = &textures[i];
-            texture->destroy();
+        for (Mesh3D *mesh : meshes) {
+            mesh->destroy();
         }
     }
 
@@ -49,8 +55,8 @@ public:
         meshes.push_back(mesh);
     }
     
-    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, Window *window) {
-        Frustum frustum(window->getProjectionMatrix() * window->camera.getViewMatrix());
+    virtual void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, Window *window) {
+        Frustum frustum(window->getProjectionMatrix() * camera.getViewMatrix());
 
         int c = 0;
         for (Mesh3D *mesh : meshes) {
@@ -73,7 +79,7 @@ public:
         //printf("Displaying: %i/%i\n", c, meshes.size());
     }
 
-    void drawUI() {
+    virtual void drawUI() {
         ImGui::SetNextWindowSize(ImVec2(120, 100));
 
         ImGui::Begin("Notification", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);

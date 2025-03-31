@@ -220,6 +220,232 @@ namespace Utils {
         m_vertices.push_back({glm::vec3(-width,  height, 0.0), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0), 0});
     }
 
+    inline float noise3D(FastNoiseLite noise, float x, float y, float z) {
+        float a = noise.GetNoise((float)x, (float)y);
+        float b = noise.GetNoise((float)y, (float)z);
+        float c = noise.GetNoise((float)x, (float)z);
+        return (a+b+c) / 3.0f;
+    }
+
+    inline void createBox(glm::vec3 AA, glm::vec3 BB, std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
+        int offset = m_vertices.size();
+        AA = AA * glm::vec3(4.0f);
+        BB = BB * glm::vec3(4.0f);
+        // face 1
+        m_vertices.push_back({glm::vec3(AA.x, AA.y, AA.z), glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0), 0});
+        m_vertices.push_back({glm::vec3(AA.x, BB.y, AA.z), glm::vec3(0.0, 0.0, 1.0), glm::vec2(0.0, 0.0), 0});
+        m_vertices.push_back({glm::vec3(BB.x, AA.y, AA.z), glm::vec3(0.0, 1.0, 0.0), glm::vec2(0.0, 0.0), 0});
+        m_vertices.push_back({glm::vec3(BB.x, BB.y, AA.z), glm::vec3(0.0, 1.0, 1.0), glm::vec2(0.0, 0.0), 0});
+
+        m_vertices.push_back({glm::vec3(AA.x, AA.y, BB.z), glm::vec3(1.0, 0.0, 0.0), glm::vec2(0.0, 0.0), 0});
+        m_vertices.push_back({glm::vec3(AA.x, BB.y, BB.z), glm::vec3(1.0, 0.0, 1.0), glm::vec2(0.0, 0.0), 0});        
+        m_vertices.push_back({glm::vec3(BB.x, AA.y, BB.z), glm::vec3(1.0, 1.0, 0.0), glm::vec2(0.0, 0.0), 0});
+        m_vertices.push_back({glm::vec3(BB.x, BB.y, BB.z), glm::vec3(1.0, 1.0, 1.0), glm::vec2(0.0, 0.0), 0});
+
+        // face 1 front
+        m_indices.push_back(offset + 0);
+        m_indices.push_back(offset + 1);
+        m_indices.push_back(offset + 2);
+        m_indices.push_back(offset + 2);
+        m_indices.push_back(offset + 1);
+        m_indices.push_back(offset + 3);
+
+        // face 2 back
+        m_indices.push_back(offset + 6);
+        m_indices.push_back(offset + 5);
+        m_indices.push_back(offset + 4);
+        m_indices.push_back(offset + 7);
+        m_indices.push_back(offset + 5);
+        m_indices.push_back(offset + 6);
+
+        // face 3 bottom
+        m_indices.push_back(offset + 0);
+        m_indices.push_back(offset + 2);
+        m_indices.push_back(offset + 4);
+
+        m_indices.push_back(offset + 4);
+        m_indices.push_back(offset + 2);
+        m_indices.push_back(offset + 6);
+
+        // face 4 top
+        m_indices.push_back(offset + 5);
+        m_indices.push_back(offset + 3);
+        m_indices.push_back(offset + 1);
+
+        m_indices.push_back(offset + 7);
+        m_indices.push_back(offset + 3);
+        m_indices.push_back(offset + 5);
+
+        // face 5 left 0 1 4 5
+        m_indices.push_back(offset + 4);
+        m_indices.push_back(offset + 1);
+        m_indices.push_back(offset + 0);
+
+        m_indices.push_back(offset + 5);
+        m_indices.push_back(offset + 1);
+        m_indices.push_back(offset + 4);
+
+        // face 6 right
+        m_indices.push_back(offset + 2);
+        m_indices.push_back(offset + 3);
+        m_indices.push_back(offset + 6);
+
+        m_indices.push_back(offset + 6);
+        m_indices.push_back(offset + 3);
+        m_indices.push_back(offset + 7);
+        
+    }
+
+    inline std::map<std::string, std::vector<std::vector<std::string>>> maze_rules = {
+        {"┳", {
+            {}, // up
+            {"┣","┗","┫","┛","┃","╋","┻"}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }},
+        {"┻", {
+            {"┣","┏","┓", "┫", "┃", "╋", "┳"}, // up
+            {}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }},
+        {" ", {
+            {"┗", "┛", "┻", "━", "┃" },
+            {"┓", "┏", "┳", "━", "┃" },
+            {"┫", "┛", "┓", "┃", "━"},
+            {"┣", "┗", "┏", "┃", "━"},
+        }},
+        {".", {
+            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
+            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
+            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
+            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
+        }},
+        {"╋", {
+            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
+            
+            {"┣","┗","┫","┛","┃","╋","┻"}, // down
+            
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }},
+        {"┛", {
+            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
+            {}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {} // right
+        }},
+        {"┗", {
+            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
+            {}, // down
+            {}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳"} // right
+        }},
+        {"┣", {
+            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
+            {"┣","┗","┫","┛","┃","╋","┻"}, // down
+            {}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }},
+        {"┫", {
+            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
+            {"┣","┗","┫","┛","┃","╋","┻"}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {}, // right
+        }},
+        {"┳", {
+            {}, // up
+            {"┣","┗","┫","┛","┃","╋","┻"}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }},
+        {"┃", {
+            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
+            {"┣", "┗","┫","┛","┃","╋","┻"}, // down
+            {}, // left
+            {}, // right
+        }},
+        {"━", {
+            {}, // up
+            {}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }},
+        {"┓", {
+            {}, // up
+            {"┣", "┗","┫","┛","┃","╋","┻"}, // down
+            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
+            {}, // right
+        }},
+        {"┏", {
+            {}, // up
+            {"┣", "┗","┫","┛","┃","╋","┻"}, // down
+            {}, // left
+            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
+        }}
+    };
+
+    inline std::vector<std::string> commonArrVal(std::vector<std::string> arr1, std::vector<std::string> arr2) {
+        std::vector<std::string> out;
+        //console.log(arr2);
+        for (int i = 0; i < arr1.size(); i++) {
+            if (std::find(arr2.begin(), arr2.end(), arr1[i]) != arr2.end()) {
+                out.push_back(arr1[i]);
+            }
+        }
+        for (int i = 0; i < arr2.size(); i++) {
+            if (std::find(arr1.begin(), arr1.end(), arr2[i]) != arr1.end()) {
+                out.push_back(arr2[i]);
+            }
+        }
+        return out;
+    }
+
+    inline std::vector<std::vector<std::string>> generateMaze(int size) {
+        // create return vector
+        std::vector<std::vector<std::string>> matrix(size);
+        for (int i = 0; i < size; i++) {
+            matrix[i].resize(size);
+            for (int j = 0; j < size; j++) {
+                matrix[i][j] = ".";
+                // clear edges
+                if (i == 0 || j == 0 || i == size-1 || j == size-1) {
+                    matrix[i][j] = " ";
+                }
+                
+            }
+        }
+        for (int y = 1; y < size-1; y++) {
+            for (int x = 1; x < size-1; x++) {
+                std::string top1 = matrix[y-1][x];
+                std::string bottom1 = matrix[y+1][x];
+                std::string left1 = matrix[y][x-1];
+                std::string right1 = matrix[y][x+1];
+
+                std::vector<std::string> upRules = maze_rules[top1][1];
+                std::vector<std::string> downRules = maze_rules[bottom1][0];
+                std::vector<std::string> leftRules = maze_rules[left1][3];
+                std::vector<std::string> rightRules = maze_rules[right1][2];
+
+                std::vector<std::string> common = commonArrVal(upRules, downRules);
+                common = commonArrVal(common, leftRules);
+                common = commonArrVal(common, rightRules);
+
+                if (matrix[y][x] == "." || matrix[y][x] == " ") {
+                    int sz = common.size();
+                    if (sz > 0) {
+                        int r = rand() % (sz-1);
+                        //printf("Common Size: %i, rand: %i\n", (int) common.size(), r);
+                        matrix[y][x] = common[ r ];
+                    } else {
+                        matrix[y][x] = " ";
+                    }
+                }
+            }
+        }
+        return matrix;
+    }
+
     inline void createGroundPlaneMesh(float size, int subdivisions, std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
         m_vertices.clear();
         m_indices.clear();
@@ -234,7 +460,46 @@ namespace Utils {
         float cellSize = size / subdivisions;
         // Calculate the half size of the ground plane
         float halfSize = size / 2.0f;
-        
+
+        float height = 0.25;
+
+        std::vector<std::vector<std::string>> maze = generateMaze(50);
+        for (int y = 0; y < maze.size(); y++) {
+            for (int x = 0; x < maze[y].size(); x++) {
+                std::string piece = maze[y][x];
+                if (piece != " ") {
+                    if (piece == "┃") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
+                    } else if (piece == "━") {
+                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "╋") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
+                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "┛") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.25}, m_vertices, m_indices);
+                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x-0.25, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "┗") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.25}, m_vertices, m_indices);
+                        createBox({(float)x + 0.25, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "┻") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y-0.25}, m_vertices, m_indices);
+                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "┳") {
+                        createBox({(float)x - 0.25, 0.0,(float)y + 0.25}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
+                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "┫") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
+                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x-0.25, height, y+0.25}, m_vertices, m_indices);
+                    } else if (piece == "┣") {
+                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
+                        createBox({(float)x + 0.25, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
+                    } else {
+                        // no piece here
+                    }
+                }
+            }
+        }
+        /*
         // Generate vertices
         for (int z = 0; z <= subdivisions; z++) {
             for (int x = 0; x <= subdivisions; x++) {
@@ -248,10 +513,17 @@ namespace Utils {
                 
                 // Add vertex (y is 0 for a ground plane)
                 // Note: normal points upward
-                float s = noise.GetNoise((float)xPos, (float)zPos); //sin(sqrt( (xPos - (size/2)) * (zPos-(size/2))));
-                int texID = (int)abs(s * 8.0f * VK::g_texturePathList.size());
+                float a = noise.GetNoise((float)xPos, (float)zPos); //sin(sqrt( (xPos - (size/2)) * (zPos-(size/2))));
+                float s = noise3D(noise, (float)xPos, (float)zPos, a);
+                float b = noise.GetNoise(a * 100.0f, s * 100.0f);
+
+                float amp = noise.GetNoise((float)xPos * 1.05f, (float)zPos * 1.05f) + b;
+
+                float yPos = b * 1.0f;//(s + abs(amp * 10.0f)) * 8.0f;
+                int texID = (int) abs( yPos * VK::g_texturePathList.size() * 0.5f ) % VK::g_texturePathList.size();
+
                 m_vertices.push_back({
-                    glm::vec3(xPos, s * 8.0f, zPos),      // Position
+                    glm::vec3(xPos, yPos, zPos),      // Position
                     glm::vec3(0.0f, 1.0f, 0.0f),      // Normal pointing up
                     glm::vec2(u, v),                  // Texture coordinates
                     texID                                 // Additional data (kept as 0 like in your example)
@@ -280,6 +552,9 @@ namespace Utils {
                 m_indices.push_back(topRight);
             }
         }
+        */
+
+        
     }
 };
 
@@ -500,7 +775,16 @@ inline void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout 
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    } 
+    // New transition: undefined to transfer src optimal
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } 
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -873,5 +1157,38 @@ namespace Assets {
         for (int i = 0; i < vertices.size(); i++) {
             vertices[i].pos -= vertexCenter;
         }
+    }
+};
+
+// physics
+#include "btBulletDynamicsCommon.h"
+#include "LinearMath/btVector3.h"
+#include "LinearMath/btAlignedObjectArray.h"
+inline btVector3 worldToPhysics(glm::vec3 pos) {
+    return btVector3(pos.x, pos.y, pos.z);
+}
+inline glm::vec3 physicsToWorld(btVector3 pos) {
+    return glm::vec3(pos.getX(),pos.getY(),pos.getZ()) / glm::vec3(1.0);
+}
+
+// WIP
+#include <deque>
+// smoother
+class smoother {
+private:
+    std::array<std::deque<float>, 100> smoothVals;
+
+public:
+    float smooth(int id, int layers, float value) {
+        float sum = 0.0;
+        while (smoothVals[id].size() > layers) {
+            smoothVals[id].pop_front();
+        }
+        smoothVals[id].push_back(value);
+        for (int i = 0; i < smoothVals[id].size(); i++) {
+            sum += smoothVals[id][i];
+            sum /= 2.0f;
+        }
+        return sum;
     }
 };

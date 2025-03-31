@@ -18,6 +18,7 @@
 #include "LinearMath/btAlignedObjectArray.h"
 
 #include "config.h"
+#include "Engine.hpp"
 
 class Camera {
 private:
@@ -31,7 +32,9 @@ private:
 
     bool isDirty = true;
 public:
-    Camera() = default;
+    Camera() {
+
+    }
 
     btRigidBody* rigidBody;
     bool grounded = true;
@@ -73,6 +76,7 @@ public:
     // Setters
     void setPosition(const glm::vec3& newPosition) {
         position = newPosition;
+
         isDirty = true;
     }
     
@@ -212,13 +216,7 @@ public:
         return viewMatrix;
     }
     glm::vec3 getVelocity() {
-        return velocity;
-    }
-    void setVelocity(glm::vec3 vel) {
-        velocity = vel;
-    }
-    void resetVelocity() {
-        velocity = glm::vec3(0.0);
+        return physicsToWorld(rigidBody->getLinearVelocity());
     }
 
     void createRigidBody() {
@@ -251,7 +249,7 @@ public:
     }
     void isGrounded(std::shared_ptr<btDynamicsWorld> world) {
         btVector3 from = rigidBody->getWorldTransform().getOrigin();
-        btVector3 to = from - btVector3(0, 1.0 + (1.0), 0);
+        btVector3 to = from - btVector3(0, 1.0 + (0.1), 0);
         
         btCollisionWorld::ClosestRayResultCallback rayCallback(from, to);
         

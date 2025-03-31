@@ -1,3 +1,5 @@
+#pragma once
+
 // physics
 #include "btBulletDynamicsCommon.h"
 #include "LinearMath/btVector3.h"
@@ -10,13 +12,7 @@
 #include "Mesh3D.hpp"
 #include "Camera.hpp"
 #include "DebugMesh.hpp"
-
-inline btVector3 worldToPhysics(glm::vec3 pos) {
-    return btVector3(pos.x, pos.y, pos.z);
-}
-inline glm::vec3 physicsToWorld(btVector3 pos) {
-    return glm::vec3(pos.getX(),pos.getY(),pos.getZ()) / glm::vec3(1.0);
-}
+#include "Engine.hpp"
 
 struct BulletContactResultCallback : public btCollisionWorld::ContactResultCallback {
 public:

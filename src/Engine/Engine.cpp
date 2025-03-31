@@ -43,5 +43,4 @@ void Utils::initIOSystem(const char * data, size_t size) {
         printf("Error description: %s\n", mz_zip_get_error_string(err_code));
         throw std::runtime_error("Failed to initialize zip archive");
     }
-
 }

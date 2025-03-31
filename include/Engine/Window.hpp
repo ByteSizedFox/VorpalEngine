@@ -28,8 +28,6 @@ private:
     glm::mat4 projectionMatrix;
 
 public:
-    Camera camera;
-
     void init(int WIDTH, int HEIGHT);
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     bool ShouldClose();
@@ -59,8 +57,5 @@ public:
     }
     void updateProjectionMatrix(int width, int height) {
         projectionMatrix = glm::perspective(glm::radians(45.0f), (float) width / (float) height, 0.001f, 1000.0f);
-    }
-    Camera *getCamera() {
-        return &camera;
     }
 };
