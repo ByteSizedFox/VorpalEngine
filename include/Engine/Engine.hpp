@@ -651,7 +651,7 @@ namespace Logger {
 };
 
 namespace Image {
-    inline void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
+    inline void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, const char* name) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -684,6 +684,15 @@ namespace Image {
         }
 
         vkBindImageMemory(VK::device, image, imageMemory, 0);
+
+        VkDebugUtilsObjectNameInfoEXT nameInfo = {
+            VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            nullptr,
+            VK_OBJECT_TYPE_IMAGE,
+            reinterpret_cast<std::uint64_t>(image),
+            name,
+        };
+        vkSetDebugUtilsObjectNameEXT(VK::device, &nameInfo);
     }
 
 // Helper function to check if a format is compressed
@@ -1170,25 +1179,3 @@ inline btVector3 worldToPhysics(glm::vec3 pos) {
 inline glm::vec3 physicsToWorld(btVector3 pos) {
     return glm::vec3(pos.getX(),pos.getY(),pos.getZ()) / glm::vec3(1.0);
 }
-
-// WIP
-#include <deque>
-// smoother
-class smoother {
-private:
-    std::array<std::deque<float>, 100> smoothVals;
-
-public:
-    float smooth(int id, int layers, float value) {
-        float sum = 0.0;
-        while (smoothVals[id].size() > layers) {
-            smoothVals[id].pop_front();
-        }
-        smoothVals[id].push_back(value);
-        for (int i = 0; i < smoothVals[id].size(); i++) {
-            sum += smoothVals[id][i];
-            sum /= 2.0f;
-        }
-        return sum;
-    }
-};

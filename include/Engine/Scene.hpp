@@ -14,14 +14,23 @@
 #include "Engine/PhysicsManager.hpp"
 #include "Engine/Camera.hpp"
 
+// forward declaration
+class Renderer;
+
 class Scene {
-private:
+protected:
     std::thread loadThread;
+
 public:
     //std::vector<Texture> textures;
     std::vector<Mesh3D*> meshes;
     Physics::PhysicsManager *physManager;
     Camera camera;
+
+    // ui mesh
+    Mesh3D uiMesh;
+    std::array<glm::vec3, 6> quadVertices;
+    std::array<glm::vec2, 6> quadUVs;
 
     bool isReady = false;
     virtual void setup() {
@@ -30,7 +39,6 @@ public:
     void init() {
         camera.createRigidBody();
         camera.setPosition({0.0, 0.0, 0.0});
-        
 
         setup();
 
@@ -49,6 +57,7 @@ public:
         for (Mesh3D *mesh : meshes) {
             mesh->destroy();
         }
+        uiMesh.destroy();
     }
 
     void add_object(Mesh3D *mesh) {
@@ -79,7 +88,7 @@ public:
         //printf("Displaying: %i/%i\n", c, meshes.size());
     }
 
-    virtual void drawUI() {
+    virtual void drawUI(Window *window) {
         ImGui::SetNextWindowSize(ImVec2(120, 100));
 
         ImGui::Begin("Notification", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);

@@ -11,13 +11,24 @@ TestScene scene1;
 bool tmp = true;
 
 void mainLoop() {
-    renderer.setScene(&scene);
+    renderer.setScene(nullptr);
 
     while (!renderer.window.ShouldClose()) {
         double now = glfwGetTime();
         renderer.frames++;
 
         glfwPollEvents();
+
+        if (renderer.window.isKeyPressed(GLFW_KEY_1)) {
+            vkDeviceWaitIdle(VK::device);
+            renderer.recreateRender(true);
+            continue;
+        }
+        if (renderer.window.isKeyPressed(GLFW_KEY_2)) {
+            vkDeviceWaitIdle(VK::device);
+            renderer.recreateRender(false);
+            continue;
+        }
 
         renderer.drawFrame();
 
@@ -27,7 +38,7 @@ void mainLoop() {
             continue;
         }
         if (renderer.window.isKeyPressed(GLFW_KEY_H) && tmp == false) {            
-            renderer.setScene(nullptr);
+            renderer.setScene(&scene);
             tmp = true;
             continue;
         }
@@ -36,6 +47,8 @@ void mainLoop() {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             renderer.updateUniformBuffer(i);
         }
+
+        // user input
         renderer.handle_input();
 
         if (now - renderer.last_time >= 1.0) {

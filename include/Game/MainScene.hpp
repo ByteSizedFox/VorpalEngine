@@ -53,7 +53,7 @@ class MainScene : public Scene {
         }
         //printf("Displaying: %i/%i\n", c, meshes.size());
     }
-    void drawUI() override {
+    void drawUI(Window *window) override {
         ImGui::SetNextWindowSize(ImVec2(120, 100));
 
         ImGui::Begin("Main Scene", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);

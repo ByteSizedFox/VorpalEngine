@@ -91,10 +91,6 @@ glm::vec2 Window::getMouseVector() {
     return {xoffset, -yoffset};
 }
 void Window::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-
     auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
     if (action == GLFW_PRESS ||action == GLFW_RELEASE) {
         app->key_pressed[key] = (action == GLFW_PRESS);

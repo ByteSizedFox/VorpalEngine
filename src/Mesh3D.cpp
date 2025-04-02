@@ -22,6 +22,7 @@ void Mesh3D::init(const char *modelName) {
     m_indices.reserve(100000);
     Logger::success("Reserved vertices & indices");
     loadModel(modelName);
+    hasPhysics = false;
 }
 
 void Mesh3D::destroy() {
@@ -74,11 +75,11 @@ void Mesh3D::createIndexBuffer() {
     vkUnmapMemory(VK::device, stagingBufferMemory);
 
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
+    std::string name = std::string("Index Buffer: ") + std::string(fileName);
     VkDebugUtilsObjectNameInfoEXT name_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
     name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
     name_info.objectHandle                  = (uint64_t) indexBuffer;
-    name_info.pObjectName                   = "Index Buffer";
+    name_info.pObjectName                   = name.c_str();
     vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
 
     Memory::copyBuffer(stagingBuffer, indexBuffer, bufferSize);
@@ -215,4 +216,6 @@ void Mesh3D::loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_i
     
     createVertexBuffer();
     createIndexBuffer();
+
+    hasPhysics = false;
 }

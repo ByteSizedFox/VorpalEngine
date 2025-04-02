@@ -40,7 +40,6 @@
 
 #include <thread>
 #include <array>
-#include <deque>
 
 #ifdef _WIN32
 #define NDEBUG
@@ -81,6 +80,11 @@ public:
             }
             currentScene = &errorScene;
         }
+        //recreateRender(enable_multisample);
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            updateDescriptorSets(i);
+        }
+
     }
 
 //private:
@@ -135,15 +139,17 @@ public:
     std::vector<void*> uniformBuffersMapped;
 
     Scene *currentScene;
-    Mesh3D uiMesh;
+    //Mesh3D uiMesh;
 
     // used for UI raycast
-    std::array<glm::vec3, 6> quadVertices;
-    std::array<glm::vec2, 6> quadUVs;
+    // std::array<glm::vec3, 6> quadVertices;
+    // std::array<glm::vec2, 6> quadUVs;
 
     bool enable_multisample = true;
 
     void recreateRender(bool multisample) {
+        vkDeviceWaitIdle(VK::device);
+
         enable_multisample = multisample;
 
         // cleanup imgui
@@ -168,6 +174,7 @@ public:
     void ImGuiTheme() {
         ImGuiStyle* style = &ImGui::GetStyle();
         style->WindowRounding = 16.0f;
+        style->WindowTitleAlign = ImVec2(0.5f, 0.5f);
     }
 
     void initImGui(bool multisample) {
@@ -208,6 +215,8 @@ public:
     }
 
     void initVulkan() {
+        enable_multisample = true;
+
         volkInitialize();
         createInstance();
         setupDebugMessenger();
@@ -230,19 +239,16 @@ public:
         createCommandPool();
         printf("Color Init\n");
         createColorResources(enable_multisample);
+        
         printf("Depth Init\n");
         createDepthResources(enable_multisample);
         printf("Framebuffer Init\n");
         createFramebuffers(enable_multisample);
+        
         printf("CommandBuffer Init\n");
+
         createCommandBuffers();
         createTextureSampler();
-
-        // we need UImesh globally
-        std::vector<Vertex> vertices;
-        std::vector<uint32_t> indices;
-        Utils::createUIMesh( (float)UI_WIDTH / (float)UI_HEIGHT, vertices, indices);
-        uiMesh.loadRaw(vertices, indices);
 
         printf("Descriptorset Layout Init\n");
         descriptorSetLayout = createDescriptorSetLayout(false);
@@ -258,19 +264,27 @@ public:
         createUniformBuffers();
         printf("GUI Init\n");
         setupUI(true); // create UI textures before descriptorsets
+        // load placeholder object for fallback textures
+        Mesh3D tmp;
+        tmp.init("assets/models/floor.glb");
+        tmp.destroy();
+
         printf("DescriptorSet Init\n");
-        createDescriptorSets();
-        
+        createDescriptorSets();      
+
         //printf("Uniform Init #2\n");
         //for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         //    updateUniformBuffer(i);
         //}
 
         // load vertices from UImesh for raycast
-        for (int i = 0; i < 6; i++) {
-            quadVertices[i] = uiMesh.m_vertices[i].pos;
-            quadUVs[i] = uiMesh.m_vertices[i].texCoord;
-        }
+        // for (int i = 0; i < 6; i++) {
+        //     quadVertices[i] = uiMesh.m_vertices[i].pos;
+        //     quadUVs[i] = uiMesh.m_vertices[i].texCoord;
+        // }
+        
+        //createUIResources(enable_multisample);
+        //createUIFramebuffer(enable_multisample);
     }
 
     double last_time = 0;
@@ -295,6 +309,13 @@ public:
         }
 
         vkDestroySwapchainKHR(VK::device, swapChain, nullptr);
+
+        // ui cleanup
+        vkDestroyFramebuffer(VK::device, uiFramebuffer, nullptr);
+        vkDestroyImageView(VK::device, uiTextureView, nullptr);
+        vkDestroyImage(VK::device, uiTexture, nullptr);
+        vkFreeMemory(VK::device, uiTextureMemory, nullptr);
+        
     }
 
     void cleanup() {
@@ -305,10 +326,9 @@ public:
         
         cleanupSwapChain();
 
-        vkDestroyImageView(VK::device, uiTextureView, nullptr);
-        vkDestroyImage(VK::device, uiTexture, nullptr);
-        vkDestroyFramebuffer(VK::device, uiFramebuffer, nullptr);
-        vkFreeMemory(VK::device, uiTextureMemory, nullptr);
+        //vkDestroyImageView(VK::device, uiTextureView, nullptr);
+        //vkDestroyImage(VK::device, uiTexture, nullptr);
+        //vkFreeMemory(VK::device, uiTextureMemory, nullptr);
 
         vkDestroyPipeline(VK::device, pipeline3D, nullptr);
         
@@ -327,10 +347,13 @@ public:
             vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
         }
 
-        uiMesh.destroy();
+        //uiMesh.destroy();
         if (errorScene.isReady) {
-            errorScene.destroy();
+            //errorScene.destroy();
         }
+        currentScene->destroy();
+
+        
         
         // texture cleanup
         for (int i = 0; i < VK::g_texturePathList.size(); i++) {
@@ -361,14 +384,14 @@ public:
     }
 
     void recreateSwapChain(bool multisample) {
+        vkDeviceWaitIdle(VK::device);
+
         int width = 0, height = 0;
         window.GetFramebufferSize(&width, &height);
         while (width == 0 || height == 0) {
             window.GetFramebufferSize(&width, &height);
             glfwWaitEvents();
         }
-
-        vkDeviceWaitIdle(VK::device);
 
         cleanupSwapChain();
 
@@ -378,12 +401,6 @@ public:
         createDepthResources(multisample);
         createFramebuffers(multisample);
 
-        // recreate UI framebuffer
-        vkDestroyImageView(VK::device, uiTextureView, nullptr);
-        vkDestroyImage(VK::device, uiTexture, nullptr);
-        vkDestroyFramebuffer(VK::device, uiFramebuffer, nullptr);
-        vkFreeMemory(VK::device, uiTextureMemory, nullptr);
-        
         setupUI(multisample);
         uiNeedsUpdate = true;
     }
@@ -589,7 +606,7 @@ public:
         for (uint32_t i = 0; i < swapChainImages.size(); i++) {
             swapChainImageViews[i] = Image::createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         }
-
+        
     }
     
     VkRenderPass createRenderPass(bool isUI, bool multisample) {
@@ -635,8 +652,11 @@ public:
         colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        
+        if (isUI) {
+            colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        } else {
+            colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        }
 
         VkAttachmentReference colorAttachmentRef{};
         colorAttachmentRef.attachment = 0;
@@ -714,7 +734,7 @@ public:
     bool uiNeedsUpdate = false;
 
     void setupUI(bool multisample) {
-        Image::createImage(UI_WIDTH, UI_HEIGHT, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory);
+        Image::createImage(UI_WIDTH, UI_HEIGHT, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory, "UI Image");
         uiTextureView = Image::createImageView(uiTexture, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         std::vector<VkImageView> attachments;
 
@@ -1023,9 +1043,9 @@ public:
     void createColorResources(bool multisample) {
         VkFormat colorFormat = swapChainImageFormat;
         if (multisample) {
-            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory, "Color Image");
         } else {
-            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory, "Color Image");
         }
         colorImageView = Image::createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
@@ -1033,9 +1053,9 @@ public:
     void createDepthResources(bool multisample) {
         VkFormat depthFormat = Utils::findDepthFormat();
         if (multisample) {
-            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory, "DEPTH image");
         } else {
-            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+            Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory, "DEPTH image");
         }
         depthImageView = Image::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
     }
@@ -1095,7 +1115,6 @@ public:
     }
 
     bool window_open = true;
-    std::deque<std::string> logText;
     int incr = 0;
     bool enablePopup = false;
     float lastPlayerSpeed = 0.0;
@@ -1107,32 +1126,30 @@ public:
         ImGui::SetNextWindowSize(ImVec2(UI_WIDTH, UI_HEIGHT));
         ImGui::SetNextWindowPos(ImVec2(0,0));
         
-        if (window_open) {
-            ImGui::Begin("Stats", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
-            ImGui::Text("FPS: %i", fps);
-            
-            glm::vec3 pos = currentScene->camera.getPosition();
+        ImGui::Begin("Stats", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
+        ImGui::Text("FPS: %i", fps);
+        
+        glm::vec3 pos = currentScene->camera.getPosition();
 
-            glm::vec3 vel = glm::pow(currentScene->camera.getVelocity(), glm::vec3(2));
-            float playerSpeed = (sqrt(vel.x+vel.y+vel.z) + lastPlayerSpeed) / 2.0f;
-            lastPlayerSpeed = playerSpeed;
+        glm::vec3 vel = glm::pow(currentScene->camera.getVelocity(), glm::vec3(2));
+        float playerSpeed = (sqrt(vel.x+vel.y+vel.z) + lastPlayerSpeed) / 2.0f;
+        lastPlayerSpeed = playerSpeed;
 
-            ImGui::Text("XYZ: %.2f %.2f %.2f", pos.x, pos.y, pos.z);
-            ImGui::Text("Speed: %.2f m/s", playerSpeed);
+        ImGui::Text("XYZ: %.2f %.2f %.2f", pos.x, pos.y, pos.z);
+        ImGui::Text("Speed: %.2f m/s", playerSpeed);
 
-            ImGui::Text("Press Escape To Exit");
-            ImGui::Text("Device Info:");
-            ImGui::Text("GPU VendorID: 0x%04X", properties.vendorID);
-            ImGui::Text("GPU DeviceID: 0x%04X", properties.deviceID);
-            ImGui::Text("GPU Name: %s", properties.deviceName);
-            ImGui::Text("GPU Driver Version: %i", properties.driverVersion);
+        ImGui::Text("Press Escape To Exit");
+        ImGui::Text("Device Info:");
+        ImGui::Text("GPU VendorID: 0x%04X", properties.vendorID);
+        ImGui::Text("GPU DeviceID: 0x%04X", properties.deviceID);
+        ImGui::Text("GPU Name: %s", properties.deviceName);
+        ImGui::Text("GPU Driver Version: %i", properties.driverVersion);
 
-            if (ImGui::Button("Press Me!")) {
-                enablePopup = true;
-            }
-
-            ImGui::End();
+        if (ImGui::Button("Press Me!")) {
+            enablePopup = true;
         }
+
+        ImGui::End();
     }
 
     void recordUI(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer frameBuffer) {
@@ -1141,7 +1158,7 @@ public:
         VkRect2D scissor{};
         VkRenderPassBeginInfo renderPassInfo{};
 
-        if (uiNeedsUpdate && window_open) {
+        if (true) {
             // ui renderpass
             renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderPassInfo.renderPass = renderPass;
@@ -1178,8 +1195,8 @@ public:
                 ImGui_ImplVulkan_NewFrame();
                 ImGui::NewFrame();
 
-                drawUI();
-                currentScene->drawUI();
+                //drawUI();
+                currentScene->drawUI(&window);
 
                 ImGui::Render();
                 ImDrawData* drawData = ImGui::GetDrawData();
@@ -1188,10 +1205,11 @@ public:
             uiNeedsUpdate = false;
         }
         // transition UI framebuffer back
-        Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
+        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);   
     }
-
+    
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -1199,6 +1217,36 @@ public:
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
             throw std::runtime_error("failed to begin recording command buffer!");
         }
+
+        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
+        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
+        recordUI(commandBuffer, uiRenderPass, uiFramebuffer);
+        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
+
+        VkImageMemoryBarrier imageBarrier = {};
+        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        imageBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.image = uiTexture;
+        imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBarrier.subresourceRange.baseMipLevel = 0;
+        imageBarrier.subresourceRange.levelCount = 1;
+        imageBarrier.subresourceRange.baseArrayLayer = 0;
+        imageBarrier.subresourceRange.layerCount = 1;
+        imageBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // wait for renderpass #1 finishes writing to color attachment
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // wait at VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+            0, 
+            0, nullptr,
+            0, nullptr,
+            1, &imageBarrier); // Do not need any layout transitions. Do we need VkMemoryBarrier? If so, what srcAccess/dstAccess ?
+
+        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
 
         VkRenderPassBeginInfo renderPassInfo{};
 
@@ -1239,7 +1287,7 @@ public:
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline3D);
         
-            uiMesh.isUI = true;
+            // uiMesh.isUI = true;
 
 #ifdef DRAW_DEBUG
             prepareDebugMesh();
@@ -1251,9 +1299,9 @@ public:
             if (currentScene->isReady) {
                 currentScene->draw(commandBuffer, pipelineLayout, &window);
             }
-            if (window_open) {
-                uiMesh.draw(commandBuffer, pipelineLayout);
-            }
+            //if (window_open) {
+                //uiMesh.draw(commandBuffer, pipelineLayout);
+            //}
 
 #ifdef DRAW_DEBUG
             if (debugMesh.m_indices.size() != 0) {
@@ -1263,8 +1311,6 @@ public:
 #endif
 
         vkCmdEndRenderPass(commandBuffer);
-
-        recordUI(commandBuffer, uiRenderPass, uiFramebuffer);
         
         //blitRenderTargetToSwapChain(commandBuffer, imageIndex);
 
@@ -1335,14 +1381,6 @@ public:
         }
 
         waitForFrame();
-        if (window.isKeyPressed(GLFW_KEY_1)) {
-            recreateRender(true);
-            return;
-        }
-        if (window.isKeyPressed(GLFW_KEY_2)) {
-            recreateRender(false);
-            return;
-        }
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(VK::device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -1355,6 +1393,13 @@ public:
         }
 
         resetFences();
+
+        // if (window.wasResized()) {
+        //     window.clearResized();
+        //     window.updateProjectionMatrix(swapChainExtent.width, swapChainExtent.height);
+        //     recreateSwapChain(enable_multisample);
+        //     updateDescriptorSets(currentFrame);
+        // }
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
         recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
@@ -1400,6 +1445,7 @@ public:
                 updateUniformBuffer(i);
             }
             recreateSwapChain(enable_multisample);
+            updateDescriptorSets(currentFrame);
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
         }
@@ -1439,11 +1485,12 @@ public:
     }
 
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-        for (const auto& availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                return availablePresentMode;
-            }
-        }
+        // disable to force vsync
+        //for (const auto& availablePresentMode : availablePresentModes) {
+        //    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        //        return availablePresentMode;
+        //    }
+        //}
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
@@ -1501,8 +1548,8 @@ public:
                     imageInfos[texID].imageView = tex.textureImageView;
                 } else {
                     if (VK::textureMap.size() <= 0) {
-                        //printf("UH, NOT GOOD!, textures don't exist\n");
-                        imageInfos[texID].imageView = uiTextureView;
+                        printf("UH, NOT GOOD!, texture %i doesnt exist\n", (int) j);
+                        imageInfos[texID].imageView = uiTextureView; //VK::textureMap[VK::g_texturePathList[0]].textureImageView;
                     } else {
                         imageInfos[texID].imageView = tex.textureImageView;
                     }
@@ -1512,7 +1559,7 @@ public:
             // fill in remaining unused images
             for (size_t j = VK::textureMap.size(); j < 75; ++j) {
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfos[j].imageView = uiTextureView;
+                imageInfos[j].imageView = VK::textureMap.begin()->second.textureImageView;
                 imageInfos[j].sampler = textureSampler;
             }
 
@@ -1645,43 +1692,46 @@ public:
             return;
         }
 
-        // raycast to 
-        glm::vec2 result;
-        glm::vec3 worldResult;
-        float distance = 1.0f;
-        bool hit = Experiment::raycastRectangle(camPos * glm::vec3(WORLD_SCALE), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, currentScene->camera.getViewMatrix(), window.getProjectionMatrix(), distance, result, worldResult);
+        // // raycast to 
+        // glm::vec2 result;
+        // glm::vec3 worldResult;
+        // float distance = 1.0f;
+        // bool hit = Experiment::raycastRectangle(camPos * glm::vec3(WORLD_SCALE), -forward, currentScene->quadVertices, currentScene->quadUVs, currentScene->uiMesh.m_indices, currentScene->uiMesh.getModelMatrix().model, currentScene->camera.getViewMatrix(), window.getProjectionMatrix(), distance, result, worldResult);
 
-        ImGuiIO& io = ImGui::GetIO();
-        if (distance <= 1.0 && hit) {
-            uiNeedsUpdate = true;
-            io.AddMousePosEvent(result.x * UI_WIDTH, result.y * UI_HEIGHT);
-            io.MouseDrawCursor = true;
-        } else {
-            if (io.MouseDrawCursor == true) {
-                uiNeedsUpdate = true; // update UI to hide cursor
-            }
-            io.AddMousePosEvent(999.0, 999.0);
-            io.MouseDrawCursor = false;
-        }
+        // ImGuiIO& io = ImGui::GetIO();
+        // if (distance <= 1.0 && hit) {
+        //     uiNeedsUpdate = true;
+        //     io.AddMousePosEvent(result.x * UI_WIDTH, result.y * UI_HEIGHT);
+        //     io.MouseDrawCursor = true;
+        // } else {
+        //     if (io.MouseDrawCursor == true) {
+        //         uiNeedsUpdate = true; // update UI to hide cursor
+        //     }
+        //     io.AddMousePosEvent(999.0, 999.0);
+        //     io.MouseDrawCursor = false;
+        // }
 
-        if (window.isKeyPressed(GLFW_KEY_E)) {
-            // dont use cursor when dragging
-            io.MouseDrawCursor = false;
-            io.AddMousePosEvent(999.0, 999.0);
+        // uiNeedsUpdate = true;
+        // window_open = true;
 
-            // get location in front of camera
-            float distance = 1.0f;
-            uiMesh.setPosition(camPos + -forward * distance);
-            glm::vec3 objectToCamera = camPos - uiMesh.getPosition();
+        // if (window.isKeyPressed(GLFW_KEY_E)) {
+        //     // dont use cursor when dragging
+        //     io.MouseDrawCursor = false;
+        //     io.AddMousePosEvent(999.0, 999.0);
 
-            // billboard rotation for the UI to the camera
-            float yaw = std::atan2(objectToCamera.x, objectToCamera.z);
-            float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
+        //     // get location in front of camera
+        //     float distance = 1.0f;
+        //     currentScene->uiMesh.setPosition(camPos + -forward * distance);
+        //     glm::vec3 objectToCamera = camPos - currentScene->uiMesh.getPosition();
 
-            // Set the rotation
-            uiMesh.setRotation({-pitch, yaw, glm::radians(0.0f)});
-            uiMesh.updateModelMatrix();
-        }
+        //     // billboard rotation for the UI to the camera
+        //     float yaw = std::atan2(objectToCamera.x, objectToCamera.z);
+        //     float pitch = std::atan2(objectToCamera.y, std::sqrt(objectToCamera.x * objectToCamera.x + objectToCamera.z * objectToCamera.z));
+
+        //     // Set the rotation
+        //     currentScene->uiMesh.setRotation({-pitch, yaw, glm::radians(0.0f)});
+        //     currentScene->uiMesh.updateModelMatrix();
+        // }
     }
 
     void updateUniformBuffer(uint32_t currentImage) {

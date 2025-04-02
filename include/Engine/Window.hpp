@@ -58,4 +58,5 @@ public:
     void updateProjectionMatrix(int width, int height) {
         projectionMatrix = glm::perspective(glm::radians(45.0f), (float) width / (float) height, 0.001f, 1000.0f);
     }
+    
 };
