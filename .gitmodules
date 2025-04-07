@@ -28,3 +28,12 @@
 [submodule "external/bullet3"]
 	path = external/bullet3
 	url = https://github.com/bulletphysics/bullet3
+[submodule "external/polly"]
+	path = external/polly
+	url = https://github.com/ruslo/polly
+[submodule "external/tinygltf"]
+	path = external/tinygltf
+	url = https://github.com/syoyo/tinygltf
+[submodule "external/miniz"]
+	path = external/miniz
+	url = https://github.com/richgel999/miniz
