@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <vector>
 #include <atomic>
-#include <thread>
 
 #include "Mesh3D.hpp"
 #include "imgui.h"
@@ -18,9 +17,6 @@
 class Renderer;
 
 class Scene {
-protected:
-    std::thread loadThread;
-
 public:
     //std::vector<Texture> textures;
     std::vector<Mesh3D*> meshes;
@@ -37,6 +33,7 @@ public:
 
     }
     void init() {
+        Logger::info("Scene", "Loading Scene...");
         camera.createRigidBody();
         camera.setPosition({0.0, 0.0, 0.0});
 
@@ -45,6 +42,8 @@ public:
         physManager = new Physics::PhysicsManager(meshes, &camera);
         
         isReady = true;
+
+        Logger::success("Scene", "Done Loading...");
     }
     void loop() {
         printf("WARNING: Unimplemented Loop!\n");
@@ -54,10 +53,11 @@ public:
     }
 
     void destroy() {
+        printf("Destroy Scene\n");
+        uiMesh.destroy();
         for (Mesh3D *mesh : meshes) {
             mesh->destroy();
         }
-        uiMesh.destroy();
     }
 
     void add_object(Mesh3D *mesh) {
@@ -65,14 +65,17 @@ public:
     }
     
     virtual void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, Window *window) {
+        printf("A\n");
         Frustum frustum(window->getProjectionMatrix() * camera.getViewMatrix());
-
+        printf("B\n");
         int c = 0;
         for (Mesh3D *mesh : meshes) {
+            printf("C\n");
             if (!mesh->hasPhysics) { // non physics-meshes dont have AABB, skip frustum culling
                 mesh->draw(commandBuffer, pipelineLayout);
                 continue;
             }
+            printf("D\n");
 
             btVector3 AA;
             btVector3 BB;
@@ -80,10 +83,14 @@ public:
             glm::vec3 min = glm::vec3(AA.getX(), AA.getY(), AA.getZ()) / glm::vec3(100.0);
             glm::vec3 max = glm::vec3(BB.getX(), BB.getY(), BB.getZ()) / glm::vec3(100.0);
 
+            printf("E\n");
+
             if (frustum.IsBoxVisible(min, max)) {
                 mesh->draw(commandBuffer, pipelineLayout);
                 c++;
             }
+
+            printf("F\n");
         }
         //printf("Displaying: %i/%i\n", c, meshes.size());
     }

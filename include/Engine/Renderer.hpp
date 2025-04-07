@@ -33,12 +33,13 @@
 #include "Engine/PhysicsManager.hpp"
 #include "VK/Validation.hpp"
 
+// waylandTests
+//#include "Engine/WindowSystem.hpp"
+
 // imgui
 #include "imgui.h"
 #include "backends/imgui_impl_vulkan.h"
-#include "Game/ErrorScene.hpp"
 
-#include <thread>
 #include <array>
 
 #ifdef _WIN32
@@ -46,14 +47,19 @@
 #endif
 
 class Renderer {
-private:
-    ErrorScene errorScene;
-
-public:
+public: 
+    // test
+    //WaylandWindow wayWin;
+    // end test
     void run() {
+        Logger::info("Renderer Run", "Init Window...");
+        //wayWin.initSurface();
         window.init(800, 600);
+        Logger::info("Renderer Run", "Init Vulkan...");
         initVulkan();
-        initImGui(true);
+        Logger::info("Renderer Run", "Init ImGui...");
+        initImGui();
+        Logger::success("Renderer Run", "Init Done!");
     }
 
     void setScene(Scene *scene) {
@@ -67,18 +73,14 @@ public:
 
         // destroy old scene if it is valid (disabled for testing)
         if (currentScene != nullptr) {
-            //currentScene->destroy();
+            currentScene->destroy();
         }
 
         currentScene = scene;
 
         // neither current or new scene are valid, load fallback scene
         if (currentScene == nullptr) {
-            printf("Scene is null, loading fallback...\n");
-            if (!errorScene.isReady) {
-                errorScene.init();
-            }
-            currentScene = &errorScene;
+            throw std::runtime_error(std::string("Error: Scene Is Null"));
         }
         //recreateRender(enable_multisample);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -139,13 +141,10 @@ public:
     std::vector<void*> uniformBuffersMapped;
 
     Scene *currentScene;
-    //Mesh3D uiMesh;
-
-    // used for UI raycast
-    // std::array<glm::vec3, 6> quadVertices;
-    // std::array<glm::vec2, 6> quadUVs;
-
+    
+    // render settings
     bool enable_multisample = true;
+    bool enable_vsync = false;
 
     void recreateRender(bool multisample) {
         vkDeviceWaitIdle(VK::device);
@@ -156,19 +155,19 @@ public:
         ImGui_ImplVulkan_Shutdown();
         ImGui::DestroyContext();
         // setup ImGui
-        initImGui(multisample);
+        initImGui();
 
         vkDestroyPipeline(VK::device, pipeline3D, nullptr);
         vkDestroyPipelineLayout(VK::device, pipelineLayout, nullptr);
         vkDestroyRenderPass(VK::device, renderPass, nullptr);
         vkDestroyRenderPass(VK::device, uiRenderPass, nullptr);
 
-        renderPass = createRenderPass(false, multisample);
-        uiRenderPass = createRenderPass(true, multisample);
+        renderPass = createRenderPass(false);
+        uiRenderPass = createRenderPass(true);
 
-        recreateSwapChain(multisample);
+        recreateSwapChain();
 
-        pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv", multisample);
+        pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv");
     }
 
     void ImGuiTheme() {
@@ -177,7 +176,7 @@ public:
         style->WindowTitleAlign = ImVec2(0.5f, 0.5f);
     }
 
-    void initImGui(bool multisample) {
+    void initImGui() {
         // Initialize ImGui
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -195,7 +194,7 @@ public:
         init_info.Subpass = 0;
         init_info.MinImageCount = 2;
         init_info.ImageCount = swapChainFramebuffers.size();
-        if (multisample) {
+        if (enable_multisample) {
             init_info.MSAASamples = msaaSamples;
         } else {
             init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -216,80 +215,45 @@ public:
 
     void initVulkan() {
         enable_multisample = true;
+        enable_vsync = true;
 
         volkInitialize();
         createInstance();
         setupDebugMessenger();
-        printf("Surface Init\n");
         createSurface();
-        printf("Device Init\n");
         pickPhysicalDevice();
         createLogicalDevice();
-        printf("SwapChain Init\n");
-        createSwapChain();
 
-        printf("ImageView Init\n");
+        createSwapChain(enable_vsync);
         createImageViews();
 
-        printf("Renderpass Init\n");
-        renderPass = createRenderPass(false, enable_multisample);
-        uiRenderPass = createRenderPass(true, enable_multisample);
+        renderPass = createRenderPass(false);
+        uiRenderPass = createRenderPass(true);
 
-        printf("CommandPool Init\n");
         createCommandPool();
-        printf("Color Init\n");
-        createColorResources(enable_multisample);
+        createColorResources();
         
-        printf("Depth Init\n");
-        createDepthResources(enable_multisample);
-        printf("Framebuffer Init\n");
-        createFramebuffers(enable_multisample);
-        
-        printf("CommandBuffer Init\n");
+        createDepthResources();
+        createFramebuffers();
 
         createCommandBuffers();
         createTextureSampler();
 
-        printf("Descriptorset Layout Init\n");
         descriptorSetLayout = createDescriptorSetLayout(false);
 
-        printf("Pipeline Init\n");
-        pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv", enable_multisample);
+        pipeline3D = createGraphicsPipeline("assets/shaders/vert.spv", "assets/shaders/frag.spv");
 
-        printf("DescriptorPool Init\n");
         createDescriptorPool();        
-        printf("Sync Init\n");
         createSyncObjects();
-        printf("Uniform Init\n");
         createUniformBuffers();
-        printf("GUI Init\n");
-        setupUI(true); // create UI textures before descriptorsets
+        setupUI(); // create UI textures before descriptorsets
         // load placeholder object for fallback textures
         Mesh3D tmp;
-        tmp.init("assets/models/floor.glb");
+        tmp.init("assets/models/fallback.glb");
         tmp.destroy();
 
-        printf("DescriptorSet Init\n");
-        createDescriptorSets();      
-
-        //printf("Uniform Init #2\n");
-        //for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        //    updateUniformBuffer(i);
-        //}
-
-        // load vertices from UImesh for raycast
-        // for (int i = 0; i < 6; i++) {
-        //     quadVertices[i] = uiMesh.m_vertices[i].pos;
-        //     quadUVs[i] = uiMesh.m_vertices[i].texCoord;
-        // }
-        
-        //createUIResources(enable_multisample);
-        //createUIFramebuffer(enable_multisample);
+        createDescriptorSets();
     }
-
-    double last_time = 0;
-    int frames = 0;
-    int fps = 0;
 
     void cleanupSwapChain() {
         vkDestroyImageView(VK::device, depthImageView, nullptr);
@@ -347,13 +311,7 @@ public:
             vkFreeMemory(VK::device, uniformBuffersMemory[i], nullptr);
         }
 
-        //uiMesh.destroy();
-        if (errorScene.isReady) {
-            //errorScene.destroy();
-        }
         currentScene->destroy();
-
-        
         
         // texture cleanup
         for (int i = 0; i < VK::g_texturePathList.size(); i++) {
@@ -383,7 +341,7 @@ public:
         glfwTerminate();
     }
 
-    void recreateSwapChain(bool multisample) {
+    void recreateSwapChain() {
         vkDeviceWaitIdle(VK::device);
 
         int width = 0, height = 0;
@@ -395,13 +353,13 @@ public:
 
         cleanupSwapChain();
 
-        createSwapChain();
+        createSwapChain(enable_vsync);
         createImageViews();
-        createColorResources(multisample);
-        createDepthResources(multisample);
-        createFramebuffers(multisample);
+        createColorResources();
+        createDepthResources();
+        createFramebuffers();
 
-        setupUI(multisample);
+        setupUI();
         uiNeedsUpdate = true;
     }
 
@@ -460,6 +418,7 @@ public:
         if (glfwCreateWindowSurface(instance, window.get(), nullptr, &VK::surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
+        //VK::surface = wayWin.getSurface(instance);
     }
 
     void pickPhysicalDevice() {
@@ -549,11 +508,17 @@ public:
         vkGetDeviceQueue(VK::device, indices.presentFamily.value(), 0, &presentQueue);
     }
 
-    void createSwapChain() {
+    void createSwapChain(bool vsync) {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(VK::physicalDevice);
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        VkPresentModeKHR presentMode;
+        if (vsync) {
+            presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        } else {
+            presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        }
+
         VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -609,12 +574,12 @@ public:
         
     }
     
-    VkRenderPass createRenderPass(bool isUI, bool multisample) {
+    VkRenderPass createRenderPass(bool isUI) {
         VkRenderPass resultPass;
 
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapChainImageFormat;
-        if (multisample) {
+        if (enable_multisample) {
             colorAttachment.samples = msaaSamples;
         } else {
             colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -624,7 +589,7 @@ public:
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        if (multisample) {
+        if (enable_multisample) {
             colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         } else {
             colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -632,7 +597,7 @@ public:
 
         VkAttachmentDescription depthAttachment{};
         depthAttachment.format = Utils::findDepthFormat();
-        if (multisample) {
+        if (enable_multisample) {
             depthAttachment.samples = msaaSamples;
         } else {
             depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -681,7 +646,7 @@ public:
         if (!isUI) {
             subpass.pDepthStencilAttachment = &depthAttachmentRef;
         }
-        if (multisample) {
+        if (enable_multisample) {
             subpass.pResolveAttachments = &colorAttachmentResolveRef;
         }
 
@@ -694,7 +659,7 @@ public:
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
         std::vector<VkAttachmentDescription> attachments;
-        if (multisample) {
+        if (enable_multisample) {
             if (isUI) {
                 attachments = { colorAttachment, colorAttachmentResolve };
             } else {
@@ -714,7 +679,7 @@ public:
         renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
-        if (multisample) {
+        if (enable_multisample) {
             renderPassInfo.dependencyCount = 1;
             renderPassInfo.pDependencies = &dependency;
         } else {
@@ -733,12 +698,12 @@ public:
     VkFramebuffer uiFramebuffer;
     bool uiNeedsUpdate = false;
 
-    void setupUI(bool multisample) {
+    void setupUI() {
         Image::createImage(UI_WIDTH, UI_HEIGHT, 1, VK_SAMPLE_COUNT_1_BIT, swapChainImageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uiTexture, uiTextureMemory, "UI Image");
         uiTextureView = Image::createImageView(uiTexture, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         std::vector<VkImageView> attachments;
 
-        if (multisample) {
+        if (enable_multisample) {
             attachments = {
                 colorImageView,
                 uiTextureView
@@ -815,7 +780,7 @@ public:
         return resultLayout;
     }
     
-    VkPipeline createGraphicsPipeline(const char* vertex_path, const char* fragment_path, bool multisample) {
+    VkPipeline createGraphicsPipeline(const char* vertex_path, const char* fragment_path) {
         VkPipeline result;
 
         auto vertShaderCode = Utils::readFileZip(vertex_path);
@@ -872,7 +837,7 @@ public:
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_FALSE;
-        if (multisample) {
+        if (enable_multisample) {
             multisampling.rasterizationSamples = msaaSamples;
         } else {
             multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -965,7 +930,7 @@ public:
         return result;
     }
     
-    void createFramebuffers(bool multisample) {
+    void createFramebuffers() {
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
         VkFramebufferCreateInfo framebufferInfo{};
@@ -978,7 +943,7 @@ public:
         for (size_t i = 0; i < swapChainImageViews.size(); i++) {
             std::vector<VkImageView> attachments;
 
-            if (multisample) {
+            if (enable_multisample) {
                 attachments = {
                     colorImageView,
                     depthImageView,
@@ -1040,9 +1005,9 @@ public:
         }
     }
 
-    void createColorResources(bool multisample) {
+    void createColorResources() {
         VkFormat colorFormat = swapChainImageFormat;
-        if (multisample) {
+        if (enable_multisample) {
             Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory, "Color Image");
         } else {
             Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory, "Color Image");
@@ -1050,9 +1015,9 @@ public:
         colorImageView = Image::createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
 
-    void createDepthResources(bool multisample) {
+    void createDepthResources() {
         VkFormat depthFormat = Utils::findDepthFormat();
-        if (multisample) {
+        if (enable_multisample) {
             Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory, "DEPTH image");
         } else {
             Image::createImage(swapChainExtent.width, swapChainExtent.height, 1, VK_SAMPLE_COUNT_1_BIT, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory, "DEPTH image");
@@ -1127,7 +1092,6 @@ public:
         ImGui::SetNextWindowPos(ImVec2(0,0));
         
         ImGui::Begin("Stats", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
-        ImGui::Text("FPS: %i", fps);
         
         glm::vec3 pos = currentScene->camera.getPosition();
 
@@ -1218,10 +1182,7 @@ public:
             throw std::runtime_error("failed to begin recording command buffer!");
         }
 
-        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
-        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
         recordUI(commandBuffer, uiRenderPass, uiFramebuffer);
-        //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
 
         VkImageMemoryBarrier imageBarrier = {};
         imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1246,6 +1207,11 @@ public:
             0, nullptr,
             1, &imageBarrier); // Do not need any layout transitions. Do we need VkMemoryBarrier? If so, what srcAccess/dstAccess ?
 
+        // update the gui when fps changes
+        if (uiNeedsUpdate && window_open) {
+            updateDescriptorSets(currentFrame);
+        }
+
         //Image::transitionImageLayout(uiTexture, swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
 
         VkRenderPassBeginInfo renderPassInfo{};
@@ -1258,12 +1224,16 @@ public:
         renderPassInfo.pClearValues = clearValues.data();
         
         VkViewport viewport{};
-        VkRect2D scissor{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float) swapChainExtent.width;
+        viewport.height = (float) swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
 
-        // update the gui when fps changes
-        if (uiNeedsUpdate && window_open) {
-            updateDescriptorSets(currentFrame);
-        }
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = swapChainExtent;
 
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
@@ -1273,35 +1243,19 @@ public:
 
         // 3d renderpass
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-                viewport.x = 0.0f;
-                viewport.y = 0.0f;
-                viewport.width = (float) swapChainExtent.width;
-                viewport.height = (float) swapChainExtent.height;
-                viewport.minDepth = 0.0f;
-                viewport.maxDepth = 1.0f;
             vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-            scissor.offset = {0, 0};
-            scissor.extent = swapChainExtent;
             vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline3D);
-        
-            // uiMesh.isUI = true;
 
 #ifdef DRAW_DEBUG
             prepareDebugMesh();
 #endif
 
-            // temporary: use only the first model descriptorsets
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &(descriptorSets)[currentFrame], 0, nullptr);
-
-            if (currentScene->isReady) {
+            if (currentScene != nullptr && currentScene->isReady) {
                 currentScene->draw(commandBuffer, pipelineLayout, &window);
             }
-            //if (window_open) {
-                //uiMesh.draw(commandBuffer, pipelineLayout);
-            //}
 
 #ifdef DRAW_DEBUG
             if (debugMesh.m_indices.size() != 0) {
@@ -1361,7 +1315,7 @@ public:
             rawIndices[i] = indices[i];
         }
         
-        debugMesh.loadRaw(rawVertices, rawIndices);
+        debugMesh.loadRaw(rawVertices, rawIndices, "Debug Mesh");
         debugMesh.setPosition({0.0,0.0,0.0});
         debugMesh.setRotation({0.0,0.0,0.0});
         debugMesh.isDebug = true;
@@ -1386,7 +1340,7 @@ public:
         VkResult result = vkAcquireNextImageKHR(VK::device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            recreateSwapChain(enable_multisample);
+            recreateSwapChain();
             return;
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("failed to acquire swap chain image!");
@@ -1444,8 +1398,9 @@ public:
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 updateUniformBuffer(i);
             }
-            recreateSwapChain(enable_multisample);
+            recreateSwapChain();
             updateDescriptorSets(currentFrame);
+            //wayWin.commit();
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("failed to present swap chain image!");
         }
@@ -1454,10 +1409,12 @@ public:
 
         // load scene if not loaded
         if (!currentScene->isReady) {
-            Logger::info("Loading Main Scene...");
+            Logger::info("Renderer", "Loading Main Scene...");
             currentScene->init();
-            Logger::success("Loaded Main Scene");
+            Logger::success("Renderer", "Loaded Main Scene");
         }
+
+        //wayWin.update();
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -1486,11 +1443,11 @@ public:
 
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
         // disable to force vsync
-        //for (const auto& availablePresentMode : availablePresentModes) {
-        //    if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-        //        return availablePresentMode;
-        //    }
-        //}
+        for (const auto& availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return availablePresentMode;
+            }
+        }
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
@@ -1621,16 +1578,10 @@ public:
         }
     }
 
-    double last_deltatime = glfwGetTime();
     double deltaTime = 0.0;
-    BulletContactResultCallback callback;
     bool canJump = true;
 
     void handle_input() {
-        double time = glfwGetTime();
-        deltaTime = time - last_deltatime;
-        last_deltatime = time;
-
         currentScene->physManager->process(deltaTime);
 
         // handle mouse input
@@ -1644,11 +1595,11 @@ public:
         const glm::vec3 forward = currentScene->camera.getForward();
 
         // avg walk speed
-        float speed = 142.0f * deltaTime;
+        float speed = 1.42f;
         if (window.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
-            speed = 250.0 * deltaTime;
+            speed = 3.0f;
         }
-        speed *= 2.0; // realistic walking speed too slow
+        speed *= 2.1336; // adjust for height scale difference
 
         glm::vec3 camVec = glm::vec3(0.0);
 
@@ -1673,8 +1624,6 @@ public:
 
         // 1ft
         float jump_height = 3.048f;
-        
-        //physManager->dynamicsWorld->contactPairTest(window.camera.rigidBody, mesh1.rigidBody, callback);
 
         // ground test
         currentScene->camera.isGrounded(currentScene->physManager->dynamicsWorld);

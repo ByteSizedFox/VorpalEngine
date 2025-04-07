@@ -8,7 +8,7 @@
 #include <glm/gtx/hash.hpp>
 
 #include <volk.h>
-
+#include <array>
 
 struct Vertex {
     glm::vec3 pos;

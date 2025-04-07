@@ -123,7 +123,7 @@ namespace Physics {
             //camera->rigidBody->setLinearVelocity(worldToPhysics(camera->getVelocity()) + btVector3(0.0, velY, 0.0));
             //camera->resetVelocity();
 
-            camera->setPosition(physicsToWorld(camera->rigidBody->getInterpolationWorldTransform().getOrigin()) + glm::vec3(0.0, 0.5, 0.0));
+            camera->setPosition(physicsToWorld(camera->rigidBody->getInterpolationWorldTransform().getOrigin()) + glm::vec3(0.0, 0.25, 0.0));
             for (Mesh3D* mesh : meshes) {
                 if (!mesh->hasPhysics) { // skip non-physics meshes
                     continue;

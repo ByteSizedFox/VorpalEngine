@@ -5,6 +5,7 @@
 layout(set = 0, binding = 1) uniform texture2D textures[75];
 layout(set = 0, binding = 2) uniform sampler samp;
 layout(set = 0, binding = 3) uniform texture2D uiTexture;
+//layout(set = 0, binding = 4) uniform sampler2D depthTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
@@ -24,4 +25,5 @@ void main() {
     } else {
         outColor = texture(sampler2D(textures[f_textureID], samp), fragTexCoord) * vec4(fragColor, 1.0);
     }
+   
 }

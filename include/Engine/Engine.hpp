@@ -1,15 +1,18 @@
 #pragma once
 
 #include "volk.h"
+
 #include <stdexcept>
 #include <fstream>
 #include <vector>
+#include <algorithm>
+#include <map>
 
-#include <assimp/IOStream.hpp>
-#include <assimp/IOSystem.hpp>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h> // Output data structure
-#include <assimp/postprocess.h>
+// #include <assimp/IOStream.hpp>
+// #include <assimp/IOSystem.hpp>
+// #include <assimp/Importer.hpp>
+// #include <assimp/scene.h> // Output data structure
+// #include <assimp/postprocess.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/intersect.hpp>
@@ -29,6 +32,18 @@
 
 // for terrain
 #include "FastNoiseLite.h"
+
+#include <time.h>
+inline double engineGetTime(void) {
+    struct timespec ts;
+    
+    // Use CLOCK_MONOTONIC for a steady clock that isn't affected by system time changes
+    // Similar to what GLFW uses internally
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    
+    // Convert to seconds (same format as glfwGetTime)
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1.0e9;
+}
 
 namespace VK {
     inline VkDevice device;
@@ -127,11 +142,11 @@ namespace Memory {
     }
 };
 
-#include "assimp/Importer.hpp"
+//#include "assimp/Importer.hpp"
 
 namespace Utils {
-    inline Assimp::Importer importer;
-    inline Assimp::IOSystem* ioSystem;
+    //inline Assimp::Importer importer;
+    //inline Assimp::IOSystem* ioSystem;
 
     void initIOSystem(const char * data, size_t size);
 
@@ -296,156 +311,6 @@ namespace Utils {
         
     }
 
-    inline std::map<std::string, std::vector<std::vector<std::string>>> maze_rules = {
-        {"┳", {
-            {}, // up
-            {"┣","┗","┫","┛","┃","╋","┻"}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }},
-        {"┻", {
-            {"┣","┏","┓", "┫", "┃", "╋", "┳"}, // up
-            {}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }},
-        {" ", {
-            {"┗", "┛", "┻", "━", "┃" },
-            {"┓", "┏", "┳", "━", "┃" },
-            {"┫", "┛", "┓", "┃", "━"},
-            {"┣", "┗", "┏", "┃", "━"},
-        }},
-        {".", {
-            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
-            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
-            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
-            {"┣", "┗", "┫", "┛", "┃", "╋", "┳", "┣","┗","┫","┛","┃","╋","┻", "┗", "╋", "┣", "━", "┻", "┳", "┛", "╋", "┫", "━", "┻", "┳"},
-        }},
-        {"╋", {
-            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
-            
-            {"┣","┗","┫","┛","┃","╋","┻"}, // down
-            
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }},
-        {"┛", {
-            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
-            {}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {} // right
-        }},
-        {"┗", {
-            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
-            {}, // down
-            {}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳"} // right
-        }},
-        {"┣", {
-            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
-            {"┣","┗","┫","┛","┃","╋","┻"}, // down
-            {}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }},
-        {"┫", {
-            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
-            {"┣","┗","┫","┛","┃","╋","┻"}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {}, // right
-        }},
-        {"┳", {
-            {}, // up
-            {"┣","┗","┫","┛","┃","╋","┻"}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }},
-        {"┃", {
-            {"┣", "┏","┓", "┫", "┃", "╋", "┳"}, // up
-            {"┣", "┗","┫","┛","┃","╋","┻"}, // down
-            {}, // left
-            {}, // right
-        }},
-        {"━", {
-            {}, // up
-            {}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }},
-        {"┓", {
-            {}, // up
-            {"┣", "┗","┫","┛","┃","╋","┻"}, // down
-            {"┗", "╋", "┣", "━", "┻", "┳", "┏"}, // left
-            {}, // right
-        }},
-        {"┏", {
-            {}, // up
-            {"┣", "┗","┫","┛","┃","╋","┻"}, // down
-            {}, // left
-            {"┛", "╋", "┫", "━", "┻", "┳", "┓"} // right
-        }}
-    };
-
-    inline std::vector<std::string> commonArrVal(std::vector<std::string> arr1, std::vector<std::string> arr2) {
-        std::vector<std::string> out;
-        //console.log(arr2);
-        for (int i = 0; i < arr1.size(); i++) {
-            if (std::find(arr2.begin(), arr2.end(), arr1[i]) != arr2.end()) {
-                out.push_back(arr1[i]);
-            }
-        }
-        for (int i = 0; i < arr2.size(); i++) {
-            if (std::find(arr1.begin(), arr1.end(), arr2[i]) != arr1.end()) {
-                out.push_back(arr2[i]);
-            }
-        }
-        return out;
-    }
-
-    inline std::vector<std::vector<std::string>> generateMaze(int size) {
-        // create return vector
-        std::vector<std::vector<std::string>> matrix(size);
-        for (int i = 0; i < size; i++) {
-            matrix[i].resize(size);
-            for (int j = 0; j < size; j++) {
-                matrix[i][j] = ".";
-                // clear edges
-                if (i == 0 || j == 0 || i == size-1 || j == size-1) {
-                    matrix[i][j] = " ";
-                }
-                
-            }
-        }
-        for (int y = 1; y < size-1; y++) {
-            for (int x = 1; x < size-1; x++) {
-                std::string top1 = matrix[y-1][x];
-                std::string bottom1 = matrix[y+1][x];
-                std::string left1 = matrix[y][x-1];
-                std::string right1 = matrix[y][x+1];
-
-                std::vector<std::string> upRules = maze_rules[top1][1];
-                std::vector<std::string> downRules = maze_rules[bottom1][0];
-                std::vector<std::string> leftRules = maze_rules[left1][3];
-                std::vector<std::string> rightRules = maze_rules[right1][2];
-
-                std::vector<std::string> common = commonArrVal(upRules, downRules);
-                common = commonArrVal(common, leftRules);
-                common = commonArrVal(common, rightRules);
-
-                if (matrix[y][x] == "." || matrix[y][x] == " ") {
-                    int sz = common.size();
-                    if (sz > 0) {
-                        int r = rand() % (sz-1);
-                        //printf("Common Size: %i, rand: %i\n", (int) common.size(), r);
-                        matrix[y][x] = common[ r ];
-                    } else {
-                        matrix[y][x] = " ";
-                    }
-                }
-            }
-        }
-        return matrix;
-    }
-
     inline void createGroundPlaneMesh(float size, int subdivisions, std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
         m_vertices.clear();
         m_indices.clear();
@@ -463,43 +328,7 @@ namespace Utils {
 
         float height = 0.25;
 
-        std::vector<std::vector<std::string>> maze = generateMaze(50);
-        for (int y = 0; y < maze.size(); y++) {
-            for (int x = 0; x < maze[y].size(); x++) {
-                std::string piece = maze[y][x];
-                if (piece != " ") {
-                    if (piece == "┃") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
-                    } else if (piece == "━") {
-                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "╋") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
-                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "┛") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.25}, m_vertices, m_indices);
-                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x-0.25, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "┗") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.25}, m_vertices, m_indices);
-                        createBox({(float)x + 0.25, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "┻") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y-0.25}, m_vertices, m_indices);
-                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "┳") {
-                        createBox({(float)x - 0.25, 0.0,(float)y + 0.25}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
-                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "┫") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
-                        createBox({(float)x - 0.5, 0.0,(float)y - 0.25}, {x-0.25, height, y+0.25}, m_vertices, m_indices);
-                    } else if (piece == "┣") {
-                        createBox({(float)x - 0.25, 0.0,(float)y - 0.5}, {x+0.25, height, y+0.5}, m_vertices, m_indices);
-                        createBox({(float)x + 0.25, 0.0,(float)y - 0.25}, {x+0.5, height, y+0.25}, m_vertices, m_indices);
-                    } else {
-                        // no piece here
-                    }
-                }
-            }
-        }
-        /*
+        
         // Generate vertices
         for (int z = 0; z <= subdivisions; z++) {
             for (int x = 0; x <= subdivisions; x++) {
@@ -552,9 +381,6 @@ namespace Utils {
                 m_indices.push_back(topRight);
             }
         }
-        */
-
-        
     }
 };
 
@@ -566,6 +392,7 @@ namespace Utils {
 #include <cstdio>
 
 namespace Logger {
+    // color definitions for printing
     inline const char *colorMap[] = {
         "\e[39m",       // reset
         "\e[38;5;33m",  // info (bright blue)
@@ -574,79 +401,103 @@ namespace Logger {
         "\e[38;5;196m", // error (bright red)
     };
 
-    // For storing log messages
+    // store start times for each key with millisecond precision
+    inline std::map<std::string, std::chrono::time_point<std::chrono::system_clock>> startMap;
+
+    // log history
     inline std::vector<std::string> log_storage;
-    
-    // Track the previous log time
-    inline std::chrono::time_point<std::chrono::system_clock> last_log_time = std::chrono::system_clock::now();
+
+    inline std::chrono::time_point<std::chrono::system_clock> getTimePoint() {
+        return std::chrono::system_clock::now();
+    }
+
+    inline time_t getTime() {
+        return std::chrono::system_clock::to_time_t(getTimePoint());
+    }
 
     inline std::string getTimestamp() {
-        auto now = std::chrono::system_clock::now();
-        auto time_t_now = std::chrono::system_clock::to_time_t(now);
-        
+        time_t now = getTime();
         std::stringstream ss;
-        ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+        ss << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S");
         return ss.str();
     }
 
-    inline std::string getTimeDiff() {
-        auto now = std::chrono::system_clock::now();
-        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_log_time);
+    inline std::string getTimeDiff(std::string key) {
+        auto now = getTimePoint();
         
+        // check if key needs setting
+        if (startMap.find(key) == startMap.end()) {
+            startMap[key] = now;
+            return "+0ms";
+        }
+        
+        // Calculate difference in milliseconds as integer
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - startMap[key]).count();
+        
+        // Format with milliseconds as integer
         std::stringstream ss;
-        ss << "+" << diff.count() << "ms";
+        ss << "+" << diff << "ms";
         
-        last_log_time = now;
+        // Update the start time for the next call
+        startMap[key] = now;
+        
         return ss.str();
     }
 
-    inline void logPrint(int color, const char *prefix, const char *message) {
+    inline void logPrint(std::string key, int color, const char *prefix, const char *message) {
         auto timestamp = getTimestamp();
-        auto time_diff = getTimeDiff();
-        
-        printf("[%s] [%s] [%s%s\e[39m] %s\n", 
-               timestamp.c_str(), 
-               time_diff.c_str(),
-               colorMap[color], 
-               prefix, 
-               message);
+        auto time_diff = getTimeDiff(key);
+    
+        printf("[%s%s\e[39m] [%s] [%s] [%s] %s\n", 
+                colorMap[color],
+                prefix,
+                timestamp.c_str(), 
+                time_diff.c_str(), 
+                key.c_str(),
+                message);
                
         // Optionally store the log
-        std::stringstream log_entry;
-        log_entry << "[" << timestamp << "] [" << time_diff << "] [" << prefix << "] " << message;
-        log_storage.push_back(log_entry.str());
+        char buf[256];
+        snprintf(buf, 256, 
+            "[%s] [%s] [%s] [%s] %s\n", 
+            key.c_str(),
+            timestamp.c_str(), 
+            time_diff.c_str(),
+            prefix, 
+            message);
+        log_storage.push_back(std::string(buf));
     }
 
     // getTimeDiff updates last_time because we still want time benchmarking when loglevel is low
-    inline void info(const char *msg) {
+    inline void info(std::string key, const char *msg) {
         if (LOGLEVEL < 3) {
-            getTimeDiff();
+            getTimeDiff(key);
             return;
         }
-        logPrint(1, "INFO", msg);
+        logPrint(key, 1, "INFO", msg);
     }
-    inline void success(const char *msg) {
+    inline void success(std::string key, const char *msg) {
         if (LOGLEVEL < 2) {
-            getTimeDiff();
+            getTimeDiff(key);
             return;
         }
-        logPrint(2, "SUCCESS", msg);
+        logPrint(key, 2, "SUCCESS", msg);
     }
     
-    inline void warning(const char *msg) {
+    inline void warning(std::string key, const char *msg) {
         if (LOGLEVEL < 1) {
-            getTimeDiff();
+            getTimeDiff(key);
             return;
         }
-        logPrint(3, "WARNING", msg);
+        logPrint(key, 3, "WARNING", msg);
     }
     
-    inline void error(const char *msg) {
+    inline void error(std::string key, const char *msg) {
         if (LOGLEVEL < 0) {
-            getTimeDiff();
+            getTimeDiff(key);
             return;
         }
-        logPrint(4, "ERROR", msg);
+        logPrint(key, 4, "ERROR", msg);
     }
 };
 
@@ -684,7 +535,7 @@ namespace Image {
         }
 
         vkBindImageMemory(VK::device, image, imageMemory, 0);
-
+#if ENABLE_DEBUG == true
         VkDebugUtilsObjectNameInfoEXT nameInfo = {
             VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             nullptr,
@@ -693,6 +544,7 @@ namespace Image {
             name,
         };
         vkSetDebugUtilsObjectNameEXT(VK::device, &nameInfo);
+#endif
     }
 
 // Helper function to check if a format is compressed
@@ -985,197 +837,384 @@ namespace Experiment {
     }
 };
 
+#include "tiny_gltf.h"
+#include <iostream>
+
 namespace Assets {
+    inline glm::mat4 getLocalMatrix( const tinygltf::Node& node) {
+        if (node.matrix.size() == 16) {
+            // Matrix is provided directly
+            return glm::mat4(
+                node.matrix[0], node.matrix[1], node.matrix[2], node.matrix[3],
+                node.matrix[4], node.matrix[5], node.matrix[6], node.matrix[7],
+                node.matrix[8], node.matrix[9], node.matrix[10], node.matrix[11],
+                node.matrix[12], node.matrix[13], node.matrix[14], node.matrix[15]
+            );
+        }
+        
+        // Decomposed transform: TRS (Translation, Rotation, Scale)
+        glm::mat4 translation = glm::mat4(1.0f);
+        glm::mat4 rotation = glm::mat4(1.0f);
+        glm::mat4 scale = glm::mat4(1.0f);
+        
+        // Apply translation
+        if (node.translation.size() == 3) {
+            translation = glm::translate(glm::mat4(1.0f), 
+                glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+        }
+        
+        // Apply rotation (quaternion)
+        if (node.rotation.size() == 4) {
+            glm::quat q(
+                node.rotation[3], // w
+                node.rotation[0], // x
+                node.rotation[1], // y
+                node.rotation[2]  // z
+            );
+            rotation = glm::mat4_cast(q);
+        }
+        
+        // Apply scale
+        if (node.scale.size() == 3) {
+            scale = glm::scale(glm::mat4(1.0f), 
+                glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+        }
+        
+        // Combine transforms: T * R * S
+        return translation * rotation * scale;
+    };
+
     inline void loadModel(const char* filename, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices, glm::vec3 &AA, glm::vec3 &BB, glm::vec3 &vertexCenter) {
-        // Import the model with postprocessing steps to ensure triangulation and texture coordinates
-        std::vector<char> model = std::move(Utils::readFileZip(filename));
-        const aiScene* scene = Utils::importer.ReadFileFromMemory(model.data(), model.size(), aiProcess_Triangulate);
+        // Create a tinygltf model, options and error/warning strings
+        tinygltf::Model model;
+        tinygltf::TinyGLTF loader;
+        std::string err;
+        std::string warn;
+        bool ret = false;
 
-        aiMatrix4x4 rootMat = scene->mRootNode->mTransformation;
+        // Load the GLTF/GLB file
+        // Determine if file is glb (binary) or gltf (text)
+        std::string ext = filename;
+        ext = ext.substr(ext.find_last_of(".") + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-        // Check if the import was successful
-        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            throw std::runtime_error("Assimp error: " + std::string(Utils::importer.GetErrorString()));
+        std::vector<char> fileData = std::move(Utils::readFileZip(filename));
+        
+        if (ext == "glb") {
+            // Binary glTF
+            ret = loader.LoadBinaryFromMemory(&model, &err, &warn, 
+                reinterpret_cast<const unsigned char*>(fileData.data()), 
+                static_cast<unsigned int>(fileData.size()));
+        } else {
+            // ASCII glTF
+            std::string json(fileData.begin(), fileData.end());
+            ret = loader.LoadASCIIFromString(&model, &err, &warn, json.c_str(), 
+                static_cast<unsigned int>(json.size()), "");
+        }
+
+        // Check for loading errors
+        if (!ret) {
+            throw std::runtime_error("TinyGLTF error: " + err);
+        }
+
+        // Print warnings if any
+        if (!warn.empty()) {
+            std::cerr << "TinyGLTF warning: " << warn << std::endl;
         }
 
         std::unordered_map<Vertex, uint32_t> uniqueVertices {};
+        
+        glm::vec3 minVec(99999.0f);
+        glm::vec3 maxVec(-99999.0f);
 
-        glm::vec3 minVec = glm::vec3(99999.0);
-        glm::vec3 maxVec = glm::vec3(-99999.0);
+        int rootNodeIdx = model.scenes[model.defaultScene].nodes[0];
+        glm::mat4 rootMat = getLocalMatrix(model.nodes[rootNodeIdx]);
 
-        // Process each mesh in the scene
-        for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
-            aiMesh* mesh = scene->mMeshes[i];
-            
-            // Get material for this mesh
-            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        
+        // Process all meshes in the model
+        for (size_t i = 0; i < model.meshes.size(); i++) {
+            const tinygltf::Mesh &mesh = model.meshes[i];
 
-            //bool hasBones = mesh->HasBones();
-            //aiBone **bones = mesh->mBones;
-
-            //for (int j = 0; j < mesh->mNumBones; j++) {
-            //    if (bones[j]->mName.C_Str()[0] != 'D') {
-            //        continue; // skip bones that do basically nothing
-            //    }
-                //printf("MeshID %i, Bone #%i, name: %s, weights: %i\n", i, j, bones[j]->mName.C_Str(), bones[j]->mNumWeights);
-            //}
-
-            // Get diffuse texture path
-            aiString texturePath;
-            int textureID = 0; // Default to 0 if no texture
-            aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
-            
-            if (ret == AI_SUCCESS) {
-                std::string texPath = "";
-                bool isEmbedded = false;
-
-                if (texturePath.C_Str()[0] == '*') {
-                    texPath = scene->mMaterials[i]->GetName().C_Str();
-                    isEmbedded = true;
-                } else {
-                    texPath = std::string("assets/textures/") + std::string(texturePath.C_Str());
-                }
-
-                // Check if texture path already exists in our global list
-                auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
-
-                if (it != VK::g_texturePathList.end()) {
-                    // Texture already exists, get its index
-                    textureID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
-                    //printf("Texture Exists: %i\n", textureID);
-                } else {
-                    // Check if file exists before adding
-
-                    bool exists = false;
-                    if (!isEmbedded) {
-                        exists = Utils::fileExistsZip(texPath);
-                    }
-                    if (exists || isEmbedded) {
-                        // Add new texture path and get its index
-                        textureID = static_cast<int>(VK::g_texturePathList.size());
-                        
-                        Texture texture;
-                        texture.textureID = textureID;
-
-                        if (isEmbedded) {
-                            texture.createAssimpTextureImage(scene->mTextures[i]);
-                        } else {
-                            texture.createTextureImage(texPath.c_str());
-                        }
-                        texture.createTextureImageView();
-
-                        VK::textureMap[texPath] = texture;
-                        VK::g_texturePathList.push_back(texPath);
-                    }
-                }
-                //printf("Texture Path: %s, id: %i\n", texturePath.C_Str(), textureID);
-                //printf("Material Name: %s, id: %i\n", scene->mMaterials[i]->GetName().C_Str(), textureID);
-            }
-
-            // Process each face (triangle) in the mesh
-            for (unsigned int j = 0; j < mesh->mNumFaces; j++) {
-                aiFace& face = mesh->mFaces[j];
-
-                // Process each index in the face
-                for (unsigned int k = 0; k < face.mNumIndices; k++) {
-                    uint32_t index = face.mIndices[k];
-
-                    // Create a new vertex structure
-                    Vertex vertex{};
-
-                    aiVector3D vec = rootMat * mesh->mVertices[index];
-
-                    // Position (AI_DEFAULT) assumes a 3D vector format.
-                    vertex.pos = {
-                        vec.x,
-                        vec.y,
-                        vec.z
-                    };
-
-                    // to get AABB
-                    if (vertex.pos.x < minVec.x) {
-                        minVec.x = vertex.pos.x;
-                    }
-                    if (vertex.pos.y < minVec.y) {
-                        minVec.y = vertex.pos.y;
-                    }
-                    if (vertex.pos.z < minVec.z) {
-                        minVec.z = vertex.pos.z;
-                    }
-
-                    if (vertex.pos.x > maxVec.x) {
-                        maxVec.x = vertex.pos.x;
-                    }
-                    if (vertex.pos.y > maxVec.y) {
-                        maxVec.y = vertex.pos.y;
-                    }
-                    if (vertex.pos.z > maxVec.z) {
-                        maxVec.z = vertex.pos.z;
-                    }
-
-                    vertexCenter += vertex.pos;
-
-                    // Texture coordinates (may be missing, but we check if valid)
-                    if (mesh->mTextureCoords[0] && j != -1) {
-                        vertex.texCoord = {
-                            mesh->mTextureCoords[0][index].x,
-                            1.0f - mesh->mTextureCoords[0][index].y // Manually flip the Y-coordinate
-                        };
-                        //printf("Texcoord #%i: %f %f\n", index, vertex.texCoord.x, vertex.texCoord.y);
-                    } else {
-                        vertex.texCoord = {0.0f, 0.0f}; // Default to (0, 0) if no texture coords
-                    }
-
-                    //if (strcmp(filename, "assets/models/Cube_B.glb")) {
-                    //printf("VERTEX: %f %f %f, %f %f\n", vec.x, vec.y, vec.z, vertex.texCoord.x, vertex.texCoord.y);
-                    //}
-
-                    // Default color (white), as per original code
-                    vertex.color = {1.0f, 1.0f, 1.0f};
+            // Process each primitive (similar to submesh in Assimp)
+            for (size_t j = 0; j < mesh.primitives.size(); j++) {
+                const tinygltf::Primitive &primitive = mesh.primitives[j];
+                
+                // Get material for this primitive
+                int materialIndex = primitive.material;
+                int textureID = 0; // Default texture ID
+                
+                // Process material and texture if available
+                if (materialIndex >= 0 && materialIndex < model.materials.size()) {
+                    const tinygltf::Material &material = model.materials[materialIndex];
                     
-                    // Store the texture ID
-                    vertex.textureID = textureID;
-                    //printf("Texture ID: %i\n", textureID);
-
-                    // If this vertex is not already in the unique list, add it
-                    if (uniqueVertices.count(vertex) == 0) {
-                        uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                        vertices.push_back(vertex);
+                    // Check for base color texture
+                    if (material.pbrMetallicRoughness.baseColorTexture.index >= 0) {
+                        int textureIndex = material.pbrMetallicRoughness.baseColorTexture.index;
+                        int sourceIndex = model.textures[textureIndex].source;
+                        
+                        if (sourceIndex >= 0 && sourceIndex < model.images.size()) {
+                            const tinygltf::Image &image = model.images[sourceIndex];
+                            std::string texPath;
+                            bool isEmbedded = true;
+                            
+                            // Use image name or create a name based on material
+                            if (!image.name.empty()) {
+                                texPath = image.name;
+                            } else if (!material.name.empty()) {
+                                texPath = material.name + "_texture";
+                            } else {
+                                texPath = "material_" + std::to_string(materialIndex) + "_texture";
+                            }
+                            
+                            // For external textures
+                            if (!image.uri.empty()) {
+                                texPath = std::string("assets/textures/") + image.uri;
+                                isEmbedded = false;
+                            }
+                            
+                            // Check if texture path already exists in our global list
+                            auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
+                            
+                            if (it != VK::g_texturePathList.end()) {
+                                // Texture already exists, get its index
+                                textureID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
+                            } else {
+                                bool exists = false;
+                                if (!isEmbedded) {
+                                    exists = Utils::fileExistsZip(texPath);
+                                } else {
+                                    // For embedded textures, they always exist since they're in the model
+                                    exists = true;
+                                }
+                                
+                                if (exists) {
+                                    // Add new texture path and get its index
+                                    textureID = static_cast<int>(VK::g_texturePathList.size());
+                                    
+                                    Texture texture;
+                                    texture.textureID = textureID;
+                                    
+                                    if (isEmbedded) {
+                                        // Create texture from embedded image data
+                                        texture.createFromGLTFImage(image);
+                                    } else {
+                                        // Create texture from file
+                                        texture.createTextureImage(texPath.c_str());
+                                    }
+                                    texture.createTextureImageView();
+                                    
+                                    VK::textureMap[texPath] = texture;
+                                    VK::g_texturePathList.push_back(texPath);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Get indices
+                if (primitive.indices >= 0) {
+                    const tinygltf::Accessor &indexAccessor = model.accessors[primitive.indices];
+                    const tinygltf::BufferView &indexBufferView = model.bufferViews[indexAccessor.bufferView];
+                    const tinygltf::Buffer &indexBuffer = model.buffers[indexBufferView.buffer];
+                    
+                    const uint8_t *indexData = &indexBuffer.data[indexBufferView.byteOffset + indexAccessor.byteOffset];
+                    
+                    // Process indices based on component type
+                    size_t indexCount = indexAccessor.count;
+                    size_t indexStride = 0;
+                    
+                    switch (indexAccessor.componentType) {
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                            indexStride = 2;
+                            break;
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                            indexStride = 4;
+                            break;
+                        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                            indexStride = 1;
+                            break;
+                        default:
+                            throw std::runtime_error("Unsupported index component type");
+                    }
+                    
+                    // Get attributes (position, texcoords, etc.)
+                    // Note: POSITION accessor should always be present
+                    if (primitive.attributes.find("POSITION") == primitive.attributes.end()) {
+                        continue; // Skip if no positions
                     }
 
-                    // Add index to the indices list
-                    indices.push_back(uniqueVertices[vertex]);
+                    const tinygltf::Accessor &posAccessor = model.accessors[primitive.attributes.at("POSITION")];
+                    const tinygltf::BufferView &posBufferView = model.bufferViews[posAccessor.bufferView];
+                    const tinygltf::Buffer &posBuffer = model.buffers[posBufferView.buffer];
+                    
+                    const float *posData = reinterpret_cast<const float *>(
+                        &posBuffer.data[posBufferView.byteOffset + posAccessor.byteOffset]);
+                    
+                    size_t vertexCount = posAccessor.count;
+                    size_t posStride = posAccessor.ByteStride(posBufferView) ? 
+                        (posAccessor.ByteStride(posBufferView) / sizeof(float)) : 3;
+                    
+                    // Get texture coordinates if available
+                    const float *texCoordData = nullptr;
+                    size_t texCoordStride = 0;
+                    
+                    if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end()) {
+                        const tinygltf::Accessor &texCoordAccessor = 
+                            model.accessors[primitive.attributes.at("TEXCOORD_0")];
+                        const tinygltf::BufferView &texCoordBufferView = 
+                            model.bufferViews[texCoordAccessor.bufferView];
+                        const tinygltf::Buffer &texCoordBuffer = 
+                            model.buffers[texCoordBufferView.buffer];
+                        
+                        texCoordData = reinterpret_cast<const float *>(
+                            &texCoordBuffer.data[texCoordBufferView.byteOffset + texCoordAccessor.byteOffset]);
+                        
+                        texCoordStride = texCoordAccessor.ByteStride(texCoordBufferView) ? 
+                            (texCoordAccessor.ByteStride(texCoordBufferView) / sizeof(float)) : 2;
+                    }
+                    
+                    // Process vertices
+                    std::vector<Vertex> tempVertices;
+                    tempVertices.reserve(vertexCount);
+                    
+                    for (size_t v = 0; v < vertexCount; v++) {
+                        Vertex vertex{};
+                        
+                        // Position
+                        vertex.pos.x = posData[v * posStride];
+                        vertex.pos.y = posData[v * posStride + 1];
+                        vertex.pos.z = posData[v * posStride + 2];
+
+                        vertex.pos = glm::vec3(rootMat * glm::vec4(vertex.pos, 1.0f));
+
+                        // Update bounding box
+                        minVec.x = std::min(minVec.x, vertex.pos.x);
+                        minVec.y = std::min(minVec.y, vertex.pos.y);
+                        minVec.z = std::min(minVec.z, vertex.pos.z);
+                        
+                        maxVec.x = std::max(maxVec.x, vertex.pos.x);
+                        maxVec.y = std::max(maxVec.y, vertex.pos.y);
+                        maxVec.z = std::max(maxVec.z, vertex.pos.z);
+                        
+                        vertexCenter += vertex.pos;
+                        
+                        // Texture coordinates
+                        if (texCoordData) {
+                            vertex.texCoord.x = texCoordData[v * texCoordStride];
+                            vertex.texCoord.y = texCoordData[v * texCoordStride + 1]; // Flip Y coordinate
+                        } else {
+                            vertex.texCoord = {0.0f, 0.0f}; // Default
+                        }
+                        
+                        // Default color (white)
+                        vertex.color = {1.0f, 1.0f, 1.0f};
+                        
+                        // Store the texture ID
+                        vertex.textureID = textureID;
+                        
+                        tempVertices.push_back(vertex);
+                    }
+                    
+                    // Process indices and create final vertices and indices
+                    for (size_t idx = 0; idx < indexCount; idx++) {
+                        uint32_t vertexIndex = 0;
+                        
+                        // Extract index based on component type
+                        switch (indexAccessor.componentType) {
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                                vertexIndex = *reinterpret_cast<const uint16_t *>(indexData + idx * indexStride);
+                                break;
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                                vertexIndex = *reinterpret_cast<const uint32_t *>(indexData + idx * indexStride);
+                                break;
+                            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                                vertexIndex = *reinterpret_cast<const uint8_t *>(indexData + idx * indexStride);
+                                break;
+                        }
+                        
+                        const Vertex &vertex = tempVertices[vertexIndex];
+                        
+                        // Check if this vertex already exists
+                        if (uniqueVertices.count(vertex) == 0) {
+                            uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                            vertices.push_back(vertex);
+                        }
+                        
+                        // Add index to final indices list
+                        indices.push_back(uniqueVertices[vertex]);
+                    }
                 }
             }
-            vertices.shrink_to_fit();
-            indices.shrink_to_fit();
         }
-
-        // store model AABB
-        AA.x = minVec.x;
-        AA.y = minVec.y;
-        AA.z = minVec.z;
-        BB.x = maxVec.x;
-        BB.y = maxVec.y;
-        BB.z = maxVec.z;
-
-        // center the model AABB
-        vertexCenter = glm::vec3( (AA.x + BB.x) / 2.0, (AA.y + BB.y) / 2.0, (AA.z + BB.z) / 2.0);
-        // center the mesh around 0,0
-        glm::vec3 offset = glm::vec3(abs(BB.x) - abs(AA.x), abs(BB.y) - abs(AA.y), abs(BB.z) - abs(AA.z));
-        for (int i = 0; i < vertices.size(); i++) {
-            vertices[i].pos -= vertexCenter;
+        
+        vertices.shrink_to_fit();
+        indices.shrink_to_fit();
+        
+        // Calculate final model metrics
+        if (!vertices.empty()) {
+            vertexCenter /= static_cast<float>(vertices.size());
         }
+        
+        // Store model AABB
+        AA = minVec;
+        BB = maxVec;
+        
+        // Center the vertices around origin
+        glm::vec3 centerPoint = (AA + BB) * 0.5f;
+        for (auto &vertex : vertices) {
+            vertex.pos -= centerPoint;
+        }
+        
+        // Update vertexCenter to reflect the centered position
+        vertexCenter = glm::vec3(0.0f);
     }
+    
+};
+
+
+
+#include "GLFW/glfw3.h"
+
+namespace Engine {
+    inline int frames;
+    inline int fps;
+    inline double deltaTime;
+    inline double lastTimeFps = engineGetTime();
+    inline double lastTimeDeltaTime = engineGetTime();
+    inline void *nextScene = nullptr;
 };
 
 // physics
 #include "btBulletDynamicsCommon.h"
 #include "LinearMath/btVector3.h"
 #include "LinearMath/btAlignedObjectArray.h"
+
+// engine utility functions
 inline btVector3 worldToPhysics(glm::vec3 pos) {
     return btVector3(pos.x, pos.y, pos.z);
 }
 inline glm::vec3 physicsToWorld(btVector3 pos) {
     return glm::vec3(pos.getX(),pos.getY(),pos.getZ()) / glm::vec3(1.0);
+}
+inline void countFrame() {
+    double now = glfwGetTime();
+    if (now - Engine::lastTimeFps >= 1.0) {
+        Engine::fps = Engine::frames;
+        Engine::frames = 0;
+    }
+    Engine::deltaTime = now - Engine::lastTimeDeltaTime;
+
+    Engine::lastTimeFps = now;
+    Engine::lastTimeDeltaTime = now;
+}
+inline double getDeltaTime() {
+    return Engine::deltaTime;
+}
+inline int getFPS() {
+    return Engine::fps;
+}
+
+// FIXME: dangerous pointer casting, make better scene queue system
+inline void loadScene(void *scene) {
+    Engine::nextScene = scene;
 }

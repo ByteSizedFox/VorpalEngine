@@ -76,7 +76,6 @@ public:
     // Setters
     void setPosition(const glm::vec3& newPosition) {
         position = newPosition;
-
         isDirty = true;
     }
     

@@ -51,7 +51,7 @@ public:
     void createVertexBuffer();
     void createIndexBuffer();
     void loadModel(const char* filename);
-    void loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices);
+    void loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices, const char *name);
 
     ModelBufferObject getModelMatrix();
     void updateModelMatrix();

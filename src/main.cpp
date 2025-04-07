@@ -1,4 +1,5 @@
 #include "Engine/Renderer.hpp"
+#include "Game/MenuScene.hpp"
 #include "Game/MainScene.hpp"
 #include "Game/TestScene.hpp"
 
@@ -6,75 +7,101 @@ extern const char _binary_a_bin_start[];
 extern const char _binary_a_bin_end[];
 
 Renderer renderer;
-MainScene scene;
-TestScene scene1;
 bool tmp = true;
 
+void setup() {
+    
+    renderer.run();
+    renderer.setScene(new MenuScene());
+    Logger::success("MAIN", "Loading Finished!");
+}
+void loop(double deltaTime) {
+    if (renderer.window.isKeyPressed(GLFW_KEY_1)) {
+        vkDeviceWaitIdle(VK::device);
+        renderer.recreateRender(true);
+        return;
+    }
+    if (renderer.window.isKeyPressed(GLFW_KEY_2)) {
+        vkDeviceWaitIdle(VK::device);
+        renderer.recreateRender(false);
+        return;
+    }
+
+    renderer.drawFrame();
+
+    if (renderer.window.isKeyPressed(GLFW_KEY_G) && tmp == true) {            
+        renderer.setScene(new MainScene());
+        tmp = false;
+        return;
+    }
+    if (renderer.window.isKeyPressed(GLFW_KEY_H) && tmp == false) {            
+        renderer.setScene(new TestScene());
+        tmp = true;
+        return;
+    }
+
+    // move camera
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        renderer.updateUniformBuffer(i);
+    }
+
+    // user input
+    renderer.handle_input();
+}
+void cleanup() {
+    renderer.cleanup();
+}
+
 void mainLoop() {
-    renderer.setScene(nullptr);
+    double fpsLastTime = engineGetTime();
+    double deltaTimeLastTime = engineGetTime();
+    double deltaTime = 0.0;
+    int frames;
+    int fps;
 
     while (!renderer.window.ShouldClose()) {
-        double now = glfwGetTime();
-        renderer.frames++;
+        // FIXME: dangerous pointer casting, make better scene queue system
+        Scene *nextScene = static_cast<Scene *>(Engine::nextScene);
+        if (nextScene != nullptr) { // a scene is queued for loading
+            nextScene->init();
+            renderer.setScene(nextScene);
+            Engine::nextScene = nullptr; // scene is loaded, clear queue
+        }
 
+        // window Events
         glfwPollEvents();
 
-        if (renderer.window.isKeyPressed(GLFW_KEY_1)) {
-            vkDeviceWaitIdle(VK::device);
-            renderer.recreateRender(true);
-            continue;
-        }
-        if (renderer.window.isKeyPressed(GLFW_KEY_2)) {
-            vkDeviceWaitIdle(VK::device);
-            renderer.recreateRender(false);
-            continue;
-        }
+        // calculate deltaTime
+        double now = engineGetTime();
+        deltaTime = now - deltaTimeLastTime;
+        deltaTimeLastTime = now;
+        renderer.deltaTime = deltaTime;
 
-        renderer.drawFrame();
-
-        if (renderer.window.isKeyPressed(GLFW_KEY_G) && tmp == true) {            
-            renderer.setScene(&scene1);
-            tmp = false;
-            continue;
-        }
-        if (renderer.window.isKeyPressed(GLFW_KEY_H) && tmp == false) {            
-            renderer.setScene(&scene);
-            tmp = true;
-            continue;
-        }
-
-        // move camera
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            renderer.updateUniformBuffer(i);
-        }
-
-        // user input
-        renderer.handle_input();
-
-        if (now - renderer.last_time >= 1.0) {
-            renderer.fps = renderer.frames;
-            renderer.frames = 0;
-            renderer.last_time = now;
-            printf("FPS: %i\n", renderer.fps);
+        // count FPS
+        frames++;
+        if (now - fpsLastTime >= 1.0) {
+            fps = frames;
+            frames = 0;
+            fpsLastTime = now;
+            printf("FPS: %i\n", fps);
             renderer.uiNeedsUpdate = true;
         }
+        
+        loop(deltaTime);
     }
     vkDeviceWaitIdle(VK::device);
-
-    // stop scenes
-    scene.destroy();
-    scene1.destroy();
 }
 
 int main() {
+    Logger::info("MAIN", "Loading...");
     // test, NOTE: this code loads a model from a zip archive
     const size_t size = _binary_a_bin_end - _binary_a_bin_start;
     Utils::initIOSystem(_binary_a_bin_start, size);
 
     try {
-        renderer.run();
+        setup();
         mainLoop();
-        renderer.cleanup();
+        cleanup();
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

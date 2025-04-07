@@ -7,20 +7,14 @@
 #include <unordered_map>
 #include <chrono>
 
-// model loading
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include <unordered_map>
 #include <vector>
 #include <stdexcept>
 
 void Mesh3D::init(const char *modelName) {
-    fileName = modelName;
-    Logger::info("Reserving vertices & indices...");
+    fileName = modelName;    
     m_vertices.reserve(100000);
     m_indices.reserve(100000);
-    Logger::success("Reserved vertices & indices");
     loadModel(modelName);
     hasPhysics = false;
 }
@@ -40,23 +34,26 @@ void Mesh3D::createVertexBuffer() {
 
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
+#if ENABLE_DEBUG == true
     VkDebugUtilsObjectNameInfoEXT name_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
     name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
     name_info.objectHandle                  = (uint64_t) stagingBuffer;
     name_info.pObjectName                   = "Staging Buffer";
     vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
+#endif
 
     void* data;
     vkMapMemory(VK::device, stagingBufferMemory, 0, bufferSize, 0, &data);
         memcpy(data, m_vertices.data(), (size_t) bufferSize);
     vkUnmapMemory(VK::device, stagingBufferMemory);
-
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+#if ENABLE_DEBUG == true
+    std::string name = std::string("Vertex Buffer: ") + std::string(fileName);
     name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
     name_info.objectHandle                  = (uint64_t) vertexBuffer;
-    name_info.pObjectName                   = "Vertex Buffer";
+    name_info.pObjectName                   = name.c_str();
     vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
-
+#endif
     Memory::copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
@@ -75,13 +72,14 @@ void Mesh3D::createIndexBuffer() {
     vkUnmapMemory(VK::device, stagingBufferMemory);
 
     Memory::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+#if ENABLE_DEBUG == true
     std::string name = std::string("Index Buffer: ") + std::string(fileName);
     VkDebugUtilsObjectNameInfoEXT name_info = {VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
     name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
     name_info.objectHandle                  = (uint64_t) indexBuffer;
     name_info.pObjectName                   = name.c_str();
     vkSetDebugUtilsObjectNameEXT(VK::device, &name_info);
-
+#endif
     Memory::copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
@@ -209,10 +207,12 @@ void Mesh3D::createRigidBody(float mass, ColliderType colliderType) {
     );
 }
 
-void Mesh3D::loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices) {
+void Mesh3D::loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_indices, const char *name) {
     this->m_vertices = m_vertices;
     this->m_indices = m_indices;
     updateModelMatrix();
+
+    this->fileName = name;
     
     createVertexBuffer();
     createIndexBuffer();

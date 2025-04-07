@@ -1,9 +1,7 @@
 #include "Engine/Texture.hpp"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 #include "Engine/Engine.hpp"
+
+#include "stb_image.h"
 
 void Texture::createTextureImageView() {
     textureImageView = Image::createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
@@ -94,7 +92,7 @@ VkFormatProperties formatProperties;
         1, &barrier);
     Command::endSingleTimeCommands(commandBuffer);
 }
-
+/*
 void Texture::createAssimpTextureImage(aiTexture *tex) {
     int texWidth, texHeight, texChannels;
 
@@ -123,6 +121,100 @@ void Texture::createAssimpTextureImage(aiTexture *tex) {
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
 
+    generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
+}
+*/
+
+void Texture::createFromGLTFImage(const tinygltf::Image& image) {
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = nullptr;
+    VkDeviceSize imageSize = 0;
+    
+    // Handle different image formats in glTF
+    if (!image.image.empty()) {
+        // Image data is already loaded in the glTF
+        texWidth = image.width;
+        texHeight = image.height;
+        texChannels = image.component;
+        
+        // If image is not RGBA, we need to convert it
+        if (texChannels != 4) {
+            // Use the existing image data but convert to RGBA
+            pixels = stbi_load_from_memory(
+                reinterpret_cast<const stbi_uc*>(image.image.data()),
+                static_cast<int>(image.image.size()),
+                &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+            
+            imageSize = texWidth * texHeight * 4;
+        } else {
+            // Already in RGBA format, just use the data directly
+            pixels = const_cast<stbi_uc*>(image.image.data());
+            imageSize = image.image.size();
+        }
+    } else if (!image.uri.empty() && image.uri.find("data:") == 0) {
+        // Handle base64 embedded image data
+        // Extract the base64 data part
+        std::string base64Data = image.uri.substr(image.uri.find(",") + 1);
+        
+        // Decode the base64 string
+        std::vector<unsigned char> decodedData;
+        decodedData.resize(base64Data.size() * 3 / 4); // Approximate size allocation
+        
+        // Use a base64 decoding library here (not shown)
+        // For example: base64_decode(base64Data, decodedData);
+        
+        // Now load the image data
+        pixels = stbi_load_from_memory(
+            decodedData.data(), 
+            static_cast<int>(decodedData.size()),
+            &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        
+        imageSize = texWidth * texHeight * 4;
+    } else {
+        throw std::runtime_error("Unsupported image format in glTF");
+    }
+    
+    // Calculate mip levels
+    mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+    
+    // Create a staging buffer for the image data
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    Memory::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                        stagingBuffer, stagingBufferMemory);
+    
+    // Copy the image data to the staging buffer
+    void* data;
+    vkMapMemory(VK::device, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(VK::device, stagingBufferMemory);
+    
+    // Free the pixel data if we allocated it
+    if (texChannels != 4 || !image.uri.empty()) {
+        stbi_image_free(pixels);
+    }
+    
+    // Create the texture image
+    std::string imageName = !image.name.empty() ? image.name : "gltf_texture";
+    Image::createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT, 
+                      VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, 
+                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, imageName.c_str());
+    
+    // Transition image layout and copy data
+    Image::transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, 
+                               VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+                               mipLevels);
+    
+    Image::copyBufferToImage(stagingBuffer, textureImage, 
+                           static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    
+    // Clean up
+    vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
+    vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
+    
+    // Generate mipmaps for better texture rendering
     generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
 }
 

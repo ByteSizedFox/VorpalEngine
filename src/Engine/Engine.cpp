@@ -1,5 +1,13 @@
 #include "Engine/Engine.hpp"
+#include "Engine/Scene.hpp"
+#include "Engine/Renderer.hpp"
 #include "miniz.h"
+
+// implementations here for symbols
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+#include "tiny_gltf.h"
 
 mz_zip_archive zip;
 std::vector<uint8_t> zipBuffer;
