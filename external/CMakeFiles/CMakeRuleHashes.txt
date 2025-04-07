@@ -1,0 +1,25 @@
+# Hashes of file build rules.
+f5ac200347cfc6b8b28e5a2d7766f950 a.bin
+4538c2b965582b912b44c36bc0e23259 assets.o
+f38edc6ef43737386475c43859e10cfe assets.zip
+92ebcce6438079f0c39b26c040da6892 external/glfw/CMakeFiles/uninstall
+57c0a0e838d9255cda1a547d86488e10 external/glfw/docs/html/index.html
+56c26ad664da7818321c855a60cedf23 external/glfw/src/CMakeFiles/update_mappings
+e55a01d1f3d45fda186722ba03daa7ad external/glfw/src/fractional-scale-v1-client-protocol-code.h
+6003593785a2e02a5a22eb554cb56701 external/glfw/src/fractional-scale-v1-client-protocol.h
+3c7fbe90c1b74fb16ed68ae76976aea0 external/glfw/src/idle-inhibit-unstable-v1-client-protocol-code.h
+91ef0263d0b8785a97d46ea6f31d4a68 external/glfw/src/idle-inhibit-unstable-v1-client-protocol.h
+f206e3c7f109f92b33eadd0890ea49a9 external/glfw/src/pointer-constraints-unstable-v1-client-protocol-code.h
+d963d2ed8ab23b4a0a3f89aec8b584e3 external/glfw/src/pointer-constraints-unstable-v1-client-protocol.h
+0fa050ae4665dea99b8a7818d5a22b21 external/glfw/src/relative-pointer-unstable-v1-client-protocol-code.h
+2e2d15b5d03557fb345cbd36eb3c6c38 external/glfw/src/relative-pointer-unstable-v1-client-protocol.h
+fbfd4da9303899dc3d2e3ac19fa01fee external/glfw/src/viewporter-client-protocol-code.h
+06ba96c51045443930481325c2c68b78 external/glfw/src/viewporter-client-protocol.h
+d4a451fd542b406417ffcb13bab93ccf external/glfw/src/wayland-client-protocol-code.h
+7dc555fd68018fa8923d1dce9a8c18ee external/glfw/src/wayland-client-protocol.h
+fde1b7183bc9928ff6d235fc2f076985 external/glfw/src/xdg-activation-v1-client-protocol-code.h
+c136364bcf3b9b5d8a41e200c8ee9baa external/glfw/src/xdg-activation-v1-client-protocol.h
+769240a7fecbf3920245a5c6ee0170d0 external/glfw/src/xdg-decoration-unstable-v1-client-protocol-code.h
+0529958016a055b8ff1dc6925a426f19 external/glfw/src/xdg-decoration-unstable-v1-client-protocol.h
+472036fe62ade3d79f64a5d121ee4533 external/glfw/src/xdg-shell-client-protocol-code.h
+36d5302e798210dea46dc5160c1452e2 external/glfw/src/xdg-shell-client-protocol.h
