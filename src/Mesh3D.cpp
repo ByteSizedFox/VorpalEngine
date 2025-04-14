@@ -86,7 +86,7 @@ void Mesh3D::createIndexBuffer() {
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
 }
 
-void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
+void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, int count) {
     // update mesh push constants
     updatePushConstants(commandBuffer, pipelineLayout);
 
@@ -97,7 +97,7 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     // draw
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_indices.size()), count, 0, 0, 0);
 }
 
 void Mesh3D::loadModel(const char* filename) {
@@ -127,14 +127,16 @@ ModelBufferObject Mesh3D::getModelMatrix() {
     }
     ModelBufferObject ubo{};
     ubo.model = modelMatrix;
-    ubo.isUI = isUI;
-    ubo.isDebug = isDebug;
+
+    // shader toggles
+    ubo.enableNormal = Engine::enableNormal;
     // return the matrix to the GPU via push constants
     return ubo;
 }
 
 void Mesh3D::updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
     ModelBufferObject buffer = getModelMatrix();
+
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelBufferObject), &buffer);
 }
 
@@ -193,7 +195,9 @@ void Mesh3D::createRigidBody(float mass, ColliderType colliderType) {
     bodyTransform.setRotation(btQuaternion(orientation.x, orientation.y, orientation.z, orientation.w));
 
     btVector3 localInertia(0, 0, 0);
-    collisionShape->calculateLocalInertia(mass, localInertia);
+    if (mass != 0.0) {
+        collisionShape->calculateLocalInertia(mass, localInertia);
+    }
     printf("Body Inertia: %f %f %f\n", localInertia.getX(), localInertia.getY(), localInertia.getZ());
 
     btDefaultMotionState* motionState = new btDefaultMotionState(bodyTransform);

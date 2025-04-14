@@ -3,7 +3,7 @@ project(vorpal_engine)
 
 # static windows linking
 if (WIN32)
-    set(CMAKE_CXX_FLAGS, -static)
+    set(CMAKE_CXX_FLAGS, -static -g3 -gdwarf-4 )
 endif()
 
 # bullet2 demos break on windows builds, not needed for project
@@ -130,7 +130,7 @@ target_compile_options(vorpal_engine PRIVATE -ffat-lto-objects -flto -O3 -ffast-
 
 # windows, copy dlls to target
 if (WIN32)
-    target_link_options(vorpal_engine PRIVATE -static )
+    target_link_options(vorpal_engine PRIVATE -static -g3 -gdwarf-4 )
 endif()
 
 target_compile_features(vorpal_engine PRIVATE cxx_std_17)

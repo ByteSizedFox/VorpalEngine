@@ -8,7 +8,7 @@
 #include "imgui.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "Window.hpp"
-#include "FrustumCull.h"
+#include "FrustumCull.hpp"
 
 #include "Engine/PhysicsManager.hpp"
 #include "Engine/Camera.hpp"
@@ -65,14 +65,12 @@ public:
     }
     
     virtual void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, Window *window) {
-        printf("A\n");
-        Frustum frustum(window->getProjectionMatrix() * camera.getViewMatrix());
-        printf("B\n");
+       
         int c = 0;
         for (Mesh3D *mesh : meshes) {
             printf("C\n");
             if (!mesh->hasPhysics) { // non physics-meshes dont have AABB, skip frustum culling
-                mesh->draw(commandBuffer, pipelineLayout);
+                mesh->draw(commandBuffer, pipelineLayout, 1);
                 continue;
             }
             printf("D\n");
@@ -84,9 +82,9 @@ public:
             glm::vec3 max = glm::vec3(BB.getX(), BB.getY(), BB.getZ()) / glm::vec3(100.0);
 
             printf("E\n");
-
-            if (frustum.IsBoxVisible(min, max)) {
-                mesh->draw(commandBuffer, pipelineLayout);
+            
+            if (camera.getFrustum().IsBoxVisible(min, max)) {
+                mesh->draw(commandBuffer, pipelineLayout, 1);
                 c++;
             }
 

@@ -55,7 +55,7 @@ public:
 
     ModelBufferObject getModelMatrix();
     void updateModelMatrix();
-    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
+    void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, int count);
     void updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
     void createRigidBody(float mass, ColliderType colliderType);
 };

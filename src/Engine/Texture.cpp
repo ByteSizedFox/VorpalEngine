@@ -125,7 +125,7 @@ void Texture::createAssimpTextureImage(aiTexture *tex) {
 }
 */
 
-void Texture::createFromGLTFImage(const tinygltf::Image& image) {
+void Texture::createFromGLTFImage(const tinygltf::Image& image, VkFormat format) {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = nullptr;
     VkDeviceSize imageSize = 0;
@@ -198,12 +198,12 @@ void Texture::createFromGLTFImage(const tinygltf::Image& image) {
     // Create the texture image
     std::string imageName = !image.name.empty() ? image.name : "gltf_texture";
     Image::createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT, 
-                      VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, 
+                      format, VK_IMAGE_TILING_OPTIMAL, 
                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, imageName.c_str());
     
     // Transition image layout and copy data
-    Image::transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, 
+    Image::transitionImageLayout(textureImage, format, 
                                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
                                mipLevels);
     
@@ -215,7 +215,7 @@ void Texture::createFromGLTFImage(const tinygltf::Image& image) {
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
     
     // Generate mipmaps for better texture rendering
-    generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
+    generateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
 }
 
 void Texture::createTextureImage(const char *path) {

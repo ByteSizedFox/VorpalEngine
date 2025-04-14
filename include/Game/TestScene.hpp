@@ -48,16 +48,13 @@ class TestScene : public Scene {
         deltaTime = time - lastTime;
         lastTime = time;
 
-        // frustum culling
-        //Frustum frustum(window->getProjectionMatrix() * camera.getViewMatrix());
-
         const glm::vec3 forward = camera.getForward();
 
         // handle mouse interaction with UI
         glm::vec2 result;
         glm::vec3 worldResult;
         float distance = 0.0;
-        bool hit = Experiment::raycastRectangle(glm::vec3(0.0,0.0,0.0), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, camera.getViewMatrix(), window->getProjectionMatrix(), distance, result, worldResult);
+        bool hit = Experiment::raycastRectangle(glm::vec3(0.0,0.0,0.0), -forward, quadVertices, quadUVs, uiMesh.m_indices, uiMesh.getModelMatrix().model, camera.getViewMatrix(), Engine::projectionMatrix, distance, result, worldResult);
         ImGuiIO& io = ImGui::GetIO();
 
         if (distance <= 1.0 && hit) {
@@ -71,21 +68,14 @@ class TestScene : public Scene {
         // draw all meshes in scene
         for (Mesh3D *mesh : meshes) {
             if (!mesh->hasPhysics) { // non physics-meshes dont have AABB, skip frustum culling
-                mesh->draw(commandBuffer, pipelineLayout);
+                mesh->draw(commandBuffer, pipelineLayout, 1 );
                 continue;
             }
-
-            // btVector3 AA;
-            // btVector3 BB;
-            // mesh->rigidBody->getAabb(AA, BB);
-            // glm::vec3 min = glm::vec3(AA.getX(), AA.getY(), AA.getZ()) / glm::vec3(100.0);
-            // glm::vec3 max = glm::vec3(BB.getX(), BB.getY(), BB.getZ()) / glm::vec3(100.0);
-
-            //if (frustum.IsBoxVisible(min, max)) {
-                mesh->draw(commandBuffer, pipelineLayout);
-            //}
+            if (camera.isVisible(mesh->rigidBody)) {
+                mesh->draw(commandBuffer, pipelineLayout, 1);
+            }
         }
-        uiMesh.draw(commandBuffer, pipelineLayout);
+        uiMesh.draw(commandBuffer, pipelineLayout, 5);
     }
 
     void drawUI(Window *window) override {

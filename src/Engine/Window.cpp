@@ -1,5 +1,5 @@
 #include "Engine/Window.hpp"
-
+#include "config.h"
 #include "glm/gtc/matrix_transform.hpp"
 
 #include <stdio.h>
@@ -38,7 +38,7 @@ void Window::init(int WIDTH, int HEIGHT) {
     });
 
     // update initial projection matrix
-    projectionMatrix = glm::perspective(glm::radians(45.0f), (float) WIDTH / (float) HEIGHT, 0.001f, 1000.0f);
+    Engine::projectionMatrix = glm::perspective(glm::radians(45.0f), (float) WIDTH / (float) HEIGHT, 0.001f, 1000.0f);
 
     // mouse and kb capture
     glfwSetKeyCallback(window, key_callback);

@@ -23,7 +23,7 @@ public:
 
     void createTextureImage(const char *path);
     //void createAssimpTextureImage(aiTexture *tex);
-    void createFromGLTFImage(const tinygltf::Image& image);
+    void createFromGLTFImage(const tinygltf::Image& image, VkFormat format);
     void destroy();
     std::string hashTexture(const char *data, size_t size);
 };

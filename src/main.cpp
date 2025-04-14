@@ -12,7 +12,7 @@ bool tmp = true;
 void setup() {
     
     renderer.run();
-    renderer.setScene(new MenuScene());
+    renderer.setScene(new MainScene());
     Logger::success("MAIN", "Loading Finished!");
 }
 void loop(double deltaTime) {
@@ -38,6 +38,13 @@ void loop(double deltaTime) {
         renderer.setScene(new TestScene());
         tmp = true;
         return;
+    }
+
+    if (renderer.window.isKeyPressed(GLFW_KEY_N)) {            
+        Engine::enableNormal = 1;
+    }
+    if (renderer.window.isKeyPressed(GLFW_KEY_M)){            
+        Engine::enableNormal = 0;
     }
 
     // move camera

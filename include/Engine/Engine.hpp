@@ -8,12 +8,6 @@
 #include <algorithm>
 #include <map>
 
-// #include <assimp/IOStream.hpp>
-// #include <assimp/IOSystem.hpp>
-// #include <assimp/Importer.hpp>
-// #include <assimp/scene.h> // Output data structure
-// #include <assimp/postprocess.h>
-
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/intersect.hpp>
 #include <glm/glm.hpp>
@@ -52,7 +46,6 @@ namespace VK {
     inline VkQueue graphicsQueue;
     inline VkSurfaceKHR surface;
     inline std::vector<std::string> g_texturePathList;
-    //inline std::vector<Texture> textures;
     inline std::unordered_map<std::string, Texture> textureMap;
 };
 
@@ -142,12 +135,7 @@ namespace Memory {
     }
 };
 
-//#include "assimp/Importer.hpp"
-
 namespace Utils {
-    //inline Assimp::Importer importer;
-    //inline Assimp::IOSystem* ioSystem;
-
     void initIOSystem(const char * data, size_t size);
 
     inline std::vector<char> readFile(const std::string& filename) {
@@ -942,6 +930,9 @@ namespace Assets {
                 // Get material for this primitive
                 int materialIndex = primitive.material;
                 int textureID = 0; // Default texture ID
+                int normalID = -1; // default normal Map ID
+
+
                 
                 // Process material and texture if available
                 if (materialIndex >= 0 && materialIndex < model.materials.size()) {
@@ -950,6 +941,7 @@ namespace Assets {
                     // Check for base color texture
                     if (material.pbrMetallicRoughness.baseColorTexture.index >= 0) {
                         int textureIndex = material.pbrMetallicRoughness.baseColorTexture.index;
+                        // wip load normal map
                         int sourceIndex = model.textures[textureIndex].source;
                         
                         if (sourceIndex >= 0 && sourceIndex < model.images.size()) {
@@ -996,7 +988,71 @@ namespace Assets {
                                     
                                     if (isEmbedded) {
                                         // Create texture from embedded image data
-                                        texture.createFromGLTFImage(image);
+                                        texture.createFromGLTFImage(image, VK_FORMAT_R8G8B8A8_SRGB);
+                                    } else {
+                                        // Create texture from file
+                                        texture.createTextureImage(texPath.c_str());
+                                    }
+                                    texture.createTextureImageView();
+                                    
+                                    VK::textureMap[texPath] = texture;
+                                    VK::g_texturePathList.push_back(texPath);
+                                }
+                            }
+                        }
+                    }
+                    // check for normal texture
+                    if (material.normalTexture.index >= 0) {
+                        printf("FOUND NORMAL TEXTURE!!!\n");
+                        int textureIndex = material.normalTexture.index;
+                        // wip load normal map
+                        int sourceIndex = model.textures[textureIndex].source;
+                        
+                        if (sourceIndex >= 0 && sourceIndex < model.images.size()) {
+                            const tinygltf::Image &image = model.images[sourceIndex];
+                            std::string texPath;
+                            bool isEmbedded = true;
+                            
+                            // Use image name or create a name based on material
+                            if (!image.name.empty()) {
+                                texPath = image.name;
+                            } else if (!material.name.empty()) {
+                                texPath = material.name + "_normal_texture";
+                            } else {
+                                texPath = "material_" + std::to_string(materialIndex) + "_normal_texture";
+                            }
+                            
+                            // For external textures
+                            if (!image.uri.empty()) {
+                                texPath = std::string("assets/textures/") + image.uri;
+                                isEmbedded = false;
+                            }
+                            
+                            // Check if texture path already exists in our global list
+                            auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
+                            
+                            if (it != VK::g_texturePathList.end()) {
+                                // Texture already exists, get its index
+                                normalID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
+                            } else {
+                                bool exists = false;
+                                if (!isEmbedded) {
+                                    exists = Utils::fileExistsZip(texPath);
+                                } else {
+                                    // For embedded textures, they always exist since they're in the model
+                                    exists = true;
+                                }
+                                
+                                if (exists) {
+                                    // Add new texture path and get its index
+                                    normalID = static_cast<int>(VK::g_texturePathList.size());
+                                    
+                                    Texture texture;
+                                    texture.textureID = normalID;
+                                    
+                                    if (isEmbedded) {
+                                        // Create texture from embedded image data
+                                        texture.createFromGLTFImage(image, VK_FORMAT_R8G8B8A8_SRGB);
                                     } else {
                                         // Create texture from file
                                         texture.createTextureImage(texPath.c_str());
@@ -1046,6 +1102,35 @@ namespace Assets {
                     const tinygltf::Accessor &posAccessor = model.accessors[primitive.attributes.at("POSITION")];
                     const tinygltf::BufferView &posBufferView = model.bufferViews[posAccessor.bufferView];
                     const tinygltf::Buffer &posBuffer = model.buffers[posBufferView.buffer];
+
+                    const float *normalData = nullptr;
+                    size_t normalStride = 0;
+                    if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
+                        const tinygltf::Accessor &normalAccessor = model.accessors[primitive.attributes.at("NORMAL")];
+                        const tinygltf::BufferView &normalBufferView = model.bufferViews[normalAccessor.bufferView];
+                        const tinygltf::Buffer &normalBuffer = model.buffers[normalBufferView.buffer];
+
+                        normalData = reinterpret_cast<const float *>(
+                            &normalBuffer.data[normalBufferView.byteOffset + normalAccessor.byteOffset]);
+                        
+                        normalStride = normalAccessor.ByteStride(normalBufferView) ? 
+                            (normalAccessor.ByteStride(normalBufferView) / sizeof(float)) : 3;
+                    }
+
+                    const float *tangentData = nullptr;
+                    size_t tangentStride = 0;
+                    
+                    if (primitive.attributes.find("TANGENT") != primitive.attributes.end()) {
+                        const tinygltf::Accessor &tangentAccessor = model.accessors[primitive.attributes.at("TANGENT")];
+                        const tinygltf::BufferView &tangentBufferView = model.bufferViews[tangentAccessor.bufferView];
+                        const tinygltf::Buffer &tangentBuffer = model.buffers[tangentBufferView.buffer];
+
+                        tangentData = reinterpret_cast<const float *>(
+                            &tangentBuffer.data[tangentBufferView.byteOffset + tangentAccessor.byteOffset]);
+                        
+                        tangentStride = tangentAccessor.ByteStride(tangentBufferView) ? 
+                            (tangentAccessor.ByteStride(tangentBufferView) / sizeof(float)) : 4;
+                    }
                     
                     const float *posData = reinterpret_cast<const float *>(
                         &posBuffer.data[posBufferView.byteOffset + posAccessor.byteOffset]);
@@ -1101,16 +1186,50 @@ namespace Assets {
                         // Texture coordinates
                         if (texCoordData) {
                             vertex.texCoord.x = texCoordData[v * texCoordStride];
-                            vertex.texCoord.y = texCoordData[v * texCoordStride + 1]; // Flip Y coordinate
+                            vertex.texCoord.y = texCoordData[v * texCoordStride + 1];
                         } else {
                             vertex.texCoord = {0.0f, 0.0f}; // Default
                         }
+
+                        // store the normal
+                        if (normalData) {
+                            vertex.normal.x = normalData[v * normalStride];
+                            vertex.normal.y = normalData[v * normalStride + 1];
+                            vertex.normal.z = normalData[v * normalStride + 2];
+                        } else {
+                            vertex.normal = {0.0f, 1.0f, 0.0f}; // default normal is up
+                        }
+                        if (tangentData) {
+                            vertex.tangent.x = tangentData[v * tangentStride];
+                            vertex.tangent.y = tangentData[v * tangentStride + 1];
+                            vertex.tangent.z = tangentData[v * tangentStride + 2];
+                            vertex.tangent.w = tangentData[v * tangentStride + 3];
+                        } else {
+                            vertex.tangent = (std::abs(vertex.normal.y) < 0.99f) ? 
+                                glm::vec4(glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), vertex.normal)), 1.0) :
+                                glm::vec4(glm::normalize(glm::cross(glm::vec3(1.0f, 0.0f, 0.0f), vertex.normal)), 1.0);
+                        }
+
+                        // vertex.normal = glm::vec3(rootMat * glm::vec4(vertex.normal, 1.0f));
+                        // vertex.tangent = glm::vec3(rootMat * glm::vec4(vertex.tangent, 1.0f));
+                        // vertex.bitangent = glm::normalize(glm::cross(vertex.tangent, vertex.normal));
+
+                        glm::mat3 normalMatrix = glm::mat3(rootMat);
+                        vertex.normal = normalMatrix * vertex.normal;
+                        vertex.tangent = rootMat * vertex.tangent;
+                        vertex.normal = glm::normalize(vertex.normal);
+                        vertex.tangent = glm::normalize(vertex.tangent);
+
+                        vertex.bitangent = glm::cross( vertex.normal, glm::vec3(vertex.tangent) ) * vertex.tangent.w;
+                        vertex.bitangent = glm::normalize(vertex.bitangent);
+
+                        if (glm::dot(glm::cross(vertex.normal, glm::vec3(vertex.tangent)), vertex.bitangent) < 0.0f){
+                            vertex.tangent = vertex.tangent * -1.0f;
+                        }
                         
-                        // Default color (white)
-                        vertex.color = {1.0f, 1.0f, 1.0f};
-                        
-                        // Store the texture ID
+                        // Store the texture ID and normal ID
                         vertex.textureID = textureID;
+                        vertex.normalID = normalID;
                         
                         tempVertices.push_back(vertex);
                     }
@@ -1182,6 +1301,12 @@ namespace Engine {
     inline double lastTimeFps = engineGetTime();
     inline double lastTimeDeltaTime = engineGetTime();
     inline void *nextScene = nullptr;
+
+    inline glm::mat4 projectionMatrix = glm::mat4(0.0);
+
+    inline glm::vec3 lightPos;
+    inline glm::vec3 camPos;
+    inline int enableNormal;
 };
 
 // physics
@@ -1218,3 +1343,16 @@ inline int getFPS() {
 inline void loadScene(void *scene) {
     Engine::nextScene = scene;
 }
+
+namespace DeviceProperties {
+    inline bool enableNonUniform = false;
+    inline void init() {
+        VkPhysicalDeviceFeatures2 features = {};
+        VkPhysicalDeviceVulkan12Features features12 = {};
+        features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        features.pNext = &features12;
+
+        vkGetPhysicalDeviceFeatures2(VK::physicalDevice, &features);
+        enableNonUniform = features12.shaderSampledImageArrayNonUniformIndexing;
+    }
+};

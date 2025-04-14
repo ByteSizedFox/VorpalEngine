@@ -4,7 +4,7 @@
    //#define ENABLE_DEBUG true
 #endif
 
-#define ENABLE_DEBUG false
+#define ENABLE_DEBUG true
 
 #define MAX_FRAMES_IN_FLIGHT 1
 #define WORLD_SCALE 0.01f
@@ -17,3 +17,5 @@
 // #define DRAW_DEBUG
 
 #define ENABLE_SHADOWS
+
+#define ENABLE_VULKAN_12_FEATURES

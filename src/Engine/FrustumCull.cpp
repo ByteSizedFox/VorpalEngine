@@ -1,8 +1,16 @@
-#include "Engine/FrustumCull.h"
+#include "Engine/FrustumCull.hpp"
 
 // FIXME: for some reason using frustum culling with mingw causes segfaults
 
+Frustum::Frustum() {
+	// nothing
+}
+
 Frustum::Frustum(glm::mat4 m) {
+	update(m);
+}
+
+void Frustum::update(glm::mat4 m) {
 	m = glm::transpose(m);
 	m_planes[Left]   = m[3] + m[0];
 	m_planes[Right]  = m[3] - m[0];
@@ -37,7 +45,6 @@ Frustum::Frustum(glm::mat4 m) {
 	m_points[5] = intersection<Left,  Top,    Far>(crosses);
 	m_points[6] = intersection<Right, Bottom, Far>(crosses);
 	m_points[7] = intersection<Right, Top,    Far>(crosses);
-
 }
 
 // http://iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm

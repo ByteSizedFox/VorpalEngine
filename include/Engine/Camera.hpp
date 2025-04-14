@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "Engine.hpp"
+#include "FrustumCull.hpp"
 
 class Camera {
 private:
@@ -29,6 +30,8 @@ private:
     glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 velocity = glm::vec3(0.0,0.0,0.0);
+
+    Frustum frustum;
 
     bool isDirty = true;
 public:
@@ -208,6 +211,8 @@ public:
         
         // Combine for view matrix
         viewMatrix = rotationMatrix * translationMatrix;
+
+        frustum.update(Engine::projectionMatrix * viewMatrix);
     }
     
     glm::mat4 getViewMatrix() {
@@ -216,6 +221,10 @@ public:
     }
     glm::vec3 getVelocity() {
         return physicsToWorld(rigidBody->getLinearVelocity());
+    }
+
+    Frustum getFrustum() {
+        return frustum;
     }
 
     void createRigidBody() {
@@ -266,4 +275,15 @@ public:
     float getVelZ() {
         return rigidBody->getLinearVelocity().getZ();
     }
+
+    bool isVisible(btRigidBody* body) {
+        btVector3 AA;
+        btVector3 BB;
+        body->getAabb(AA, BB);
+        glm::vec3 min = glm::vec3(AA.getX(), AA.getY(), AA.getZ()) / glm::vec3(100.0);
+        glm::vec3 max = glm::vec3(BB.getX(), BB.getY(), BB.getZ()) / glm::vec3(100.0);
+
+        return frustum.IsBoxVisible(min, max);
+    }
+
 };
