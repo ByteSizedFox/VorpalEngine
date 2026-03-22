@@ -34,3 +34,9 @@
 [submodule "external/miniz"]
 	path = external/miniz
 	url = https://github.com/richgel999/miniz
+[submodule "external/lua"]
+	path = external/lua
+	url = https://github.com/lua/lua.git
+[submodule "external/sol2"]
+	path = external/sol2
+	url = https://github.com/ThePhD/sol2.git

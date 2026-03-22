@@ -110,6 +110,7 @@ public:
     VkRenderPass uiRenderPass;
 
     VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorSetLayout uiDescriptorSetLayout;
 
     VkSampler textureSampler;
 
@@ -259,6 +260,7 @@ public:
         createTextureSampler();
 
         descriptorSetLayout = createDescriptorSetLayout(false);
+        uiDescriptorSetLayout = createDescriptorSetLayout(true);
 
         pipeline3D = createGraphicsPipeline(pipelineLayout, "assets/shaders/vert.spv", "assets/shaders/frag.spv", true, true);
         skyboxPipeline = createGraphicsPipeline(skyboxPipelineLayout, "assets/shaders/sky.vert.spv", "assets/shaders/sky.frag.spv", false, false);
@@ -347,6 +349,7 @@ public:
 
         vkDestroyDescriptorPool(VK::device, descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(VK::device, descriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(VK::device, uiDescriptorSetLayout, nullptr);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(VK::device, renderFinishedSemaphores[i], nullptr);
@@ -495,8 +498,12 @@ public:
         memset(&features, false, sizeof(VkPhysicalDeviceVulkan12Features));
         features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
         features.timelineSemaphore = true;
+        features.descriptorIndexing = true;
+        features.shaderSampledImageArrayNonUniformIndexing = true;
+        features.runtimeDescriptorArray = true;
+        features.descriptorBindingPartiallyBound = true;
+        features.descriptorBindingSampledImageUpdateAfterBind = true;
         features.pNext = nullptr;
-        //features.runtimeDescriptorArray = true;
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1094,7 +1101,7 @@ public:
         poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         poolSizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        poolSizes[3].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[3].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 80);
 
         poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         poolSizes[4].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -1777,7 +1784,7 @@ public:
         ubo.proj = Engine::projectionMatrix;
         ubo.proj[1][1] *= -1;
         
-        ubo.time = glfwGetTime() + 300.0; // additional 5 minutes to start half way through the day
+        ubo.time = (glfwGetTime() * 100.0) + 300.0; // additional 5 minutes to start half way through the day
 
         // shader enabled features
         ubo.lightPos = Engine::lightPos;

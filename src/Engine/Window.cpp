@@ -47,6 +47,9 @@ void Window::init(int WIDTH, int HEIGHT) {
 bool Window::ShouldClose() {
     return glfwWindowShouldClose(window);
 }
+void Window::setShouldClose(bool value) {
+    glfwSetWindowShouldClose(window, value ? GLFW_TRUE : GLFW_FALSE);
+}
 void Window::destroy() {
     glfwDestroyWindow(window);
 }

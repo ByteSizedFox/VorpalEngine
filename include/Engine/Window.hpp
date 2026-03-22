@@ -28,6 +28,7 @@ public:
     void init(int WIDTH, int HEIGHT);
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     bool ShouldClose();
+    void setShouldClose(bool value);
     void destroy();
     void GetFramebufferSize(int *width, int *height);
     GLFWwindow* get() {

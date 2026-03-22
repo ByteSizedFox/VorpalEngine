@@ -140,7 +140,20 @@ inline bool isDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceFeatures supportedFeatures;
     vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate  && supportedFeatures.samplerAnisotropy;
+    bool featuresSupported = supportedFeatures.samplerAnisotropy;
+
+#ifdef ENABLE_VULKAN_12_FEATURES
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    VkPhysicalDeviceFeatures2 features2{};
+    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features2.pNext = &features12;
+    vkGetPhysicalDeviceFeatures2(device, &features2);
+
+    featuresSupported = featuresSupported && features12.descriptorIndexing && features12.shaderSampledImageArrayNonUniformIndexing;
+#endif
+
+    return indices.isComplete() && extensionsSupported && swapChainAdequate && featuresSupported;
 }
 inline bool checkValidationLayerSupport() {
     uint32_t layerCount;

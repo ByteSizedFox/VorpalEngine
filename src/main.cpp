@@ -2,6 +2,7 @@
 #include "Game/MenuScene.hpp"
 #include "Game/MainScene.hpp"
 #include "Game/TestScene.hpp"
+#include "Engine/LuaScene.hpp"
 
 extern const char _binary_a_bin_start[];
 extern const char _binary_a_bin_end[];
@@ -12,7 +13,7 @@ bool tmp = true;
 void setup() {
     
     renderer.run();
-    renderer.setScene(new MainScene());
+    renderer.setScene(new LuaScene("assets/scripts/game.lua"));
     Logger::success("MAIN", "Loading Finished!");
 }
 void loop(double deltaTime) {
@@ -63,8 +64,8 @@ void mainLoop() {
     double fpsLastTime = engineGetTime();
     double deltaTimeLastTime = engineGetTime();
     double deltaTime = 0.0;
-    int frames;
-    int fps;
+    int frames = 0;
+    int fps = 0;
 
     while (!renderer.window.ShouldClose()) {
         // FIXME: dangerous pointer casting, make better scene queue system
@@ -94,6 +95,7 @@ void mainLoop() {
             renderer.uiNeedsUpdate = true;
         }
         
+        renderer.drawFrame();
         loop(deltaTime);
     }
     vkDeviceWaitIdle(VK::device);

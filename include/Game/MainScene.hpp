@@ -15,6 +15,7 @@ class MainScene : public Scene {
 
     float deltaTime = engineGetTime();
     float lastTime = deltaTime;
+    bool ePressed = false;
 
     void setup() override {
         // load models
@@ -49,6 +50,22 @@ class MainScene : public Scene {
         double time = engineGetTime();
         deltaTime = time - lastTime;
         lastTime = time;
+
+        if (window->isKeyPressed(GLFW_KEY_E)) {
+            if (!ePressed) {
+                glm::vec3 camPos = camera.getPosition();
+                glm::vec3 forward = camera.getForward();
+                // Use -forward because camera.getForward() actually points backward in this engine
+                uiMesh.setPosition(camPos - forward * 0.5f);
+                
+                // Align UI orientation with camera orientation so it faces the camera
+                uiMesh.setOrientation(camera.getOrientation());
+                
+                ePressed = true;
+            }
+        } else {
+            ePressed = false;
+        }
 
         const glm::vec3 forward = camera.getForward();
         glm::vec3 camPos = physicsToWorld(camera.rigidBody->getInterpolationWorldTransform().getOrigin()) + glm::vec3(0.0, 0.25, 0.0);
@@ -90,12 +107,8 @@ class MainScene : public Scene {
             }
         }
 
-        double dayLength = 20.0;
-        double t = (time / dayLength) * 2.0 * 3.14159265;
-        double x = cos(t) * 1000.0;
-        double y = sin(t) * 1000.0; 
- 
-        Engine::lightPos = glm::vec3(x, y, 0.0);
+        // Static sun position halfway between noon and sunset (diagonal)
+        Engine::lightPos = glm::vec3(707.0f, 707.0f, 707.0f);
         Engine::camPos = camera.getPosition() / glm::vec3(100.0);
     }
 

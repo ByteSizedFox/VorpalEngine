@@ -58,6 +58,7 @@ void Mesh3D::createVertexBuffer() {
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
+    printf("Created buffer for %s: %p\n", fileName.c_str(), (void*)vertexBuffer);
 }
 void Mesh3D::createIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(m_indices[0]) * m_indices.size();
@@ -84,9 +85,13 @@ void Mesh3D::createIndexBuffer() {
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
+    printf("Created buffer for %s: %p\n", fileName.c_str(), (void*)indexBuffer);
 }
 
 void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, int count) {
+    if (vertexBuffer == VK_NULL_HANDLE || indexBuffer == VK_NULL_HANDLE) {
+        return;
+    }
     // update mesh push constants
     updatePushConstants(commandBuffer, pipelineLayout);
 
@@ -130,6 +135,8 @@ ModelBufferObject Mesh3D::getModelMatrix() {
 
     // shader toggles
     ubo.enableNormal = Engine::enableNormal;
+    ubo.metallic = metallic;
+    ubo.roughness = roughness;
     // return the matrix to the GPU via push constants
     return ubo;
 }

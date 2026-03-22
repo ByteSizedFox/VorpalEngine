@@ -103,6 +103,7 @@ add_subdirectory(external/glm)
 add_subdirectory(external/bullet3)
 add_subdirectory(external/tinygltf)
 add_subdirectory(external/miniz)
+add_subdirectory(external/lua)
 
 target_include_directories (vorpal_engine PUBLIC
     external/Vulkan-Headers/include
@@ -113,6 +114,8 @@ target_include_directories (vorpal_engine PUBLIC
     external/bullet3/src/
     external/tinygltf/
     external/miniz
+    external/lua
+    external/sol2/include
     ${CMAKE_CURRENT_BINARY_DIR}/external/miniz
 )
 
@@ -124,7 +127,7 @@ set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
 
 #find_package(Bullet REQUIRED)
 #target_link_libraries(vorpal_engine glfw glm assimp ${BULLET_LIBRARIES} wayland-client xkbcommon xdg-shell)
-target_link_libraries(vorpal_engine glm Bullet3Common Bullet3Collision BulletDynamics Bullet3Dynamics BulletCollision Bullet3Geometry LinearMath glfw miniz tinygltf)
+target_link_libraries(vorpal_engine glm Bullet3Common Bullet3Collision BulletDynamics Bullet3Dynamics BulletCollision Bullet3Geometry LinearMath glfw miniz tinygltf lua)
 target_include_directories(vorpal_engine PRIVATE include)
 target_compile_options(vorpal_engine PRIVATE -ffat-lto-objects -flto -O3 -ffast-math)
 

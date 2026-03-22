@@ -16,6 +16,7 @@ struct Vertex {
     glm::vec2 texCoord;
     int32_t textureID;
     int32_t normalID;
+    int32_t metallicRoughnessID;
     glm::vec4 tangent;
     glm::vec3 bitangent;
 
@@ -28,8 +29,8 @@ struct Vertex {
         return bindingDescription;
     }
 
-    static std::array<VkVertexInputAttributeDescription, 7> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 7> attributeDescriptions{};
+    static std::array<VkVertexInputAttributeDescription, 8> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 8> attributeDescriptions{};
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
@@ -58,13 +59,18 @@ struct Vertex {
 
         attributeDescriptions[5].binding = 0;
         attributeDescriptions[5].location = 5;
-        attributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT; // vec4
-        attributeDescriptions[5].offset = offsetof(Vertex, tangent);
+        attributeDescriptions[5].format = VK_FORMAT_R32_SINT;
+        attributeDescriptions[5].offset = offsetof(Vertex, metallicRoughnessID);
 
         attributeDescriptions[6].binding = 0;
         attributeDescriptions[6].location = 6;
-        attributeDescriptions[6].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[6].offset = offsetof(Vertex, bitangent);
+        attributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT; // vec4
+        attributeDescriptions[6].offset = offsetof(Vertex, tangent);
+
+        attributeDescriptions[7].binding = 0;
+        attributeDescriptions[7].location = 7;
+        attributeDescriptions[7].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[7].offset = offsetof(Vertex, bitangent);
 
         return attributeDescriptions;
     }
@@ -100,5 +106,7 @@ struct StorageBufferObject {
 // wip
 struct ModelBufferObject {
     alignas(16) glm::mat4 model;
-    alignas(16) int enableNormal;
+    alignas(4) int enableNormal;
+    alignas(4) float metallic;
+    alignas(4) float roughness;
 };

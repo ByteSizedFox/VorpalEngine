@@ -931,6 +931,7 @@ namespace Assets {
                 int materialIndex = primitive.material;
                 int textureID = 0; // Default texture ID
                 int normalID = -1; // default normal Map ID
+                int metallicRoughnessID = -1; // default metallic/roughness Map ID
 
 
                 
@@ -1055,6 +1056,60 @@ namespace Assets {
                                         texture.createFromGLTFImage(image, VK_FORMAT_R8G8B8A8_SRGB);
                                     } else {
                                         // Create texture from file
+                                        texture.createTextureImage(texPath.c_str());
+                                    }
+                                    texture.createTextureImageView();
+                                    
+                                    VK::textureMap[texPath] = texture;
+                                    VK::g_texturePathList.push_back(texPath);
+                                }
+                            }
+                        }
+                    }
+                    // check for metallic/roughness texture
+                    if (material.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
+                        int textureIndex = material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+                        int sourceIndex = model.textures[textureIndex].source;
+                        
+                        if (sourceIndex >= 0 && sourceIndex < model.images.size()) {
+                            const tinygltf::Image &image = model.images[sourceIndex];
+                            std::string texPath;
+                            bool isEmbedded = true;
+                            
+                            if (!image.name.empty()) {
+                                texPath = image.name;
+                            } else if (!material.name.empty()) {
+                                texPath = material.name + "_mr_texture";
+                            } else {
+                                texPath = "material_" + std::to_string(materialIndex) + "_mr_texture";
+                            }
+                            
+                            if (!image.uri.empty()) {
+                                texPath = std::string("assets/textures/") + image.uri;
+                                isEmbedded = false;
+                            }
+                            
+                            auto it = std::find(VK::g_texturePathList.begin(), VK::g_texturePathList.end(), texPath);
+                            
+                            if (it != VK::g_texturePathList.end()) {
+                                metallicRoughnessID = static_cast<int>(std::distance(VK::g_texturePathList.begin(), it));
+                            } else {
+                                bool exists = false;
+                                if (!isEmbedded) {
+                                    exists = Utils::fileExistsZip(texPath);
+                                } else {
+                                    exists = true;
+                                }
+                                
+                                if (exists) {
+                                    metallicRoughnessID = static_cast<int>(VK::g_texturePathList.size());
+                                    
+                                    Texture texture;
+                                    texture.textureID = metallicRoughnessID;
+                                    
+                                    if (isEmbedded) {
+                                        texture.createFromGLTFImage(image, VK_FORMAT_R8G8B8A8_UNORM);
+                                    } else {
                                         texture.createTextureImage(texPath.c_str());
                                     }
                                     texture.createTextureImageView();
@@ -1230,6 +1285,7 @@ namespace Assets {
                         // Store the texture ID and normal ID
                         vertex.textureID = textureID;
                         vertex.normalID = normalID;
+                        vertex.metallicRoughnessID = metallicRoughnessID;
                         
                         tempVertices.push_back(vertex);
                     }

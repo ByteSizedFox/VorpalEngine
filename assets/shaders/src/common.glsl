@@ -1,6 +1,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 const float dayLength = 300.0; // 20*60 20 minute day cycle
+const float AMBIENT_SCALE = 1.2; // Global ambient brightness control
 
 vec3 calculateSunDirection(float time) {
     float angle = (time / dayLength) * 2.0 * 3.14159265;

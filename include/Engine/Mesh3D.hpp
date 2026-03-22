@@ -34,13 +34,16 @@ public:
 
     glm::vec3 modelCenter;
 
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+    VkBuffer indexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
 
     bool isUI = false;
     bool isDebug = false;
+
+    float metallic = 0.0f;
+    float roughness = 0.5f;
 
     Mesh3D() {
 

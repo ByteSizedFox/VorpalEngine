@@ -2,91 +2,89 @@
 
 #include "common.glsl"
 
-#extension GL_EXT_nonuniform_qualifier : enable
-
-layout(set = 0, binding = 1) uniform texture2D textures[75];
-layout(set = 0, binding = 2) uniform sampler samp;
-layout(set = 0, binding = 3) uniform texture2D uiTexture;
-
 layout(location = 0) in vec3 fragWorldPos;
 layout(location = 1) flat in float time;
 layout(location = 2) flat in vec3 lightPos;
 
 layout(location = 0) out vec4 outColor;
 
-vec3 calculateEyeDir() {
-    return normalize(fragWorldPos);
+// Simplified ACES fitting
+vec3 aces(vec3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
-// CLOUD TEST
-// Simple hash function
+// Noise helpers for clouds
 float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-// Simple noise function
 float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
     vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+    return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 
-// Function to generate clouds
-vec3 generateClouds(vec3 color, vec2 uv, float time, float density) {
-    vec3 clouds_edge_color = vec3(0.8, 0.8, 0.98);
-    vec3 clouds_top_color = vec3(1.0, 1.0, 1.00);
-    vec3 clouds_middle_color = vec3(0.92, 0.92, 0.98);
-    vec3 clouds_bottom_color = vec3(0.83, 0.83, 0.94);
-    float clouds_cutoff = 0.4;
-    float clouds_fuzziness = 0.5;
-
-    float n1 = noise(uv * 2.0 + time * 0.1);
-    float n2 = 0.5 * noise(uv * 4.0 + time * 0.2);
-    float n3 = 0.25 * noise(uv * 8.0 + time * 0.3);
-
-    n1 = smoothstep(clouds_cutoff, clouds_cutoff + clouds_fuzziness, n1);
-    n2 = smoothstep(clouds_cutoff, clouds_cutoff + clouds_fuzziness, n2 + n1 * 0.2) * 1.1;
-    n3 = smoothstep(clouds_cutoff, clouds_cutoff + clouds_fuzziness, n3 + n2 * 0.4) * 1.2;
-
-    vec3 clouds_color = mix(color, clouds_top_color, n3);
-    clouds_color = mix(clouds_color, clouds_middle_color, n2);
-    clouds_color = mix(clouds_color, clouds_bottom_color, n1);
-    // The edge color gives a nice smooth edge, you can try turning this off if you need sharper edges
-    clouds_color = mix(clouds_color, clouds_edge_color, n3);
-
-    return vec3(clouds_color);
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 rot = mat2(1.6, 1.2, -1.2, 1.6);
+    for (int i = 0; i < 5; ++i) {
+        v += a * noise(p);
+        p = rot * p * 2.0 + time * 0.01;
+        a *= 0.5;
+    }
+    return v;
 }
 
-vec3 getSkyColor(vec3 eyeDir, vec3 sunDir) {
-    float sunDot = max(dot(eyeDir, sunDir), 0.0);
-    float sunIntensity = pow(sunDot, 256.0);
-    vec3 sunColor = vec3(1.0, 0.9, 0.7) * sunIntensity;
-    return vec3(0.3, 0.5, 0.8) + sunColor;
-}
-
-// END CLOUD TEST
 void main() {
-    vec3 EYEDIR = calculateEyeDir();
-    float depth = abs(EYEDIR.y);
-    vec3 POSITION = vec3(0.0,0.0,0.0);
-    vec2 sky_uv = EYEDIR.xz / sqrt(EYEDIR.y);
-    vec3 sunDir = normalize( lightPos );
+    vec3 eyeDir = normalize(fragWorldPos);
+    vec3 sunDir = normalize(lightPos);
+    
+    float sunHeight = sunDir.y;
+    float dayFactor = smoothstep(-0.1, 0.1, sunHeight);
+    float sunsetFactor = smoothstep(0.4, -0.1, sunHeight);
+    
+    // Base sky colors (Linear)
+    vec3 skyTop = mix(vec3(0.0, 0.01, 0.03), vec3(0.02, 0.08, 0.25), dayFactor);
+    vec3 skyHorizon = mix(vec3(0.01, 0.01, 0.02), vec3(0.3, 0.4, 0.6), dayFactor);
+    
+    // Sunset tint
+    vec3 sunsetColor = vec3(0.6, 0.2, 0.05);
+    skyHorizon = mix(skyHorizon, sunsetColor, sunsetFactor * dayFactor);
+    
+    float viewHeight = max(eyeDir.y, 0.0);
+    vec3 color = mix(skyHorizon, skyTop, pow(viewHeight, 0.8));
+    
+    // Procedural Clouds
+    if (eyeDir.y > 0.0) {
+        vec2 cloudUV = eyeDir.xz / (eyeDir.y + 0.3);
+        float cloudDensity = fbm(cloudUV * 0.5 + time * 0.02);
+        cloudDensity = smoothstep(0.4, 0.7, cloudDensity) * viewHeight; // Fade clouds at horizon
+        
+        vec3 cloudColor = mix(vec3(0.8, 0.85, 0.9), vec3(1.0), dayFactor);
+        cloudColor = mix(cloudColor, sunsetColor, sunsetFactor * 0.5);
+        
+        color = mix(color, cloudColor, cloudDensity * 0.6);
+    }
 
-    // get color for sky and ground
-    vec3 groundColor = vec3(0.5, 0.2, 0.8);
-    vec3 skyColor = getSkyColor(EYEDIR, sunDir);
-    // combine sky and ground
-    vec3 color = mix(skyColor, groundColor, -EYEDIR.y);
-    // apply clouds
-    //color = generateClouds(color, sky_uv * 0.5, time, 0.5);
-
-    // Blend grid and clouds
-    outColor.rgb = mix(skyColor, color, clamp(abs(EYEDIR.y) / 0.25, 0.0, 1.0));
-    outColor.a = 1.0; //depth * 0.5;
+    // Sun
+    float sunDot = max(dot(eyeDir, sunDir), 0.0);
+    if (sunDot > 0.0) {
+        float sunDisk = smoothstep(0.999, 1.0, sunDot);
+        vec3 sunColor = vec3(1.0, 0.95, 0.8) * 3.0 * dayFactor;
+        float sunGlow = pow(sunDot, 128.0) * 0.4 * dayFactor;
+        color += sunColor * sunDisk + mix(sunColor, sunsetColor, sunsetFactor) * sunGlow;
+    }
+    
+    // Ground
+    if (eyeDir.y < 0.0) color = skyTop; //vec3(0.01);
+    
+    outColor = vec4(aces(color), 1.0);
 }
-	

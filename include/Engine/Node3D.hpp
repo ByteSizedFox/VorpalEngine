@@ -8,7 +8,7 @@ class Node3D {
 protected:
     // node transform
     glm::vec3 position = glm::vec3(0.0f);
-    glm::quat orientation;
+    glm::quat orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::mat4 modelMatrix = glm::mat4(1.0);
 
     // dirty update flag
@@ -29,6 +29,7 @@ public:
     }
     void setRotation(glm::vec3 rotation) {
         orientation = glm::quat(rotation);
+        isDirty = true;
     }
     void setMatrix(glm::mat4 mat) {
         modelMatrix = mat;
