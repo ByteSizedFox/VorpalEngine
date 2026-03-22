@@ -5,6 +5,7 @@
 layout(set = 0, binding = 1) uniform texture2D textures[75];
 layout(set = 0, binding = 2) uniform sampler samp;
 layout(set = 0, binding = 3) uniform texture2D uiTexture;
+layout(set = 0, binding = 5) uniform sampler2DShadow shadowMap;
 
 layout(location = 0) in vec3 fragNormal;
 layout(location = 1) flat in int f_textureID;
@@ -19,6 +20,7 @@ layout(location = 8) in vec3 inFragPos;
 layout(location = 9) in vec2 inTexCoords;
 layout(location = 10) in mat3 inTBN;
 layout(location = 13) flat in int f_mrID;
+layout(location = 14) in vec4 inFragPosLightSpace;
 
 layout(location = 0) out vec4 FragColor;
 
@@ -54,6 +56,26 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+float ShadowCalculation(vec4 fragPosLightSpace) {
+    // perform perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    // transform to [0,1] range
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
+    
+    if (projCoords.z > 1.0) return 0.0;
+
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            shadow += texture(shadowMap, vec3(projCoords.xy + vec2(x, y) * texelSize, projCoords.z));
+        }    
+    }
+    shadow /= 9.0;
+    
+    return 1.0 - shadow;
 }
 
 void main() {
@@ -94,6 +116,8 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
     vec3 Lo = vec3(0.0);
 
+    float shadow = ShadowCalculation(inFragPosLightSpace);
+
     if (f_mrID >= 0) {
         // PBR Path (Metallic-Roughness Map present)
         vec4 mrSample = textureIndex(0, textures, samp, inTexCoords, f_mrID);
@@ -114,11 +138,11 @@ void main() {
         float denominator = 4.0 * NdotV * NdotL + 0.001;
         vec3 specular = numerator / denominator;
 
-        Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
+        Lo = (kD * albedo / PI + specular) * lightColor * NdotL * (1.0 - shadow);
     } else {
         // Pure Diffuse Path (No specular map)
         float kD = (1.0 - f_metallic); // Metals have no diffuse
-        Lo = (kD * albedo / PI) * lightColor * NdotL;
+        Lo = (kD * albedo / PI) * lightColor * NdotL * (1.0 - shadow);
     }
 
     vec3 color = ambient + Lo;

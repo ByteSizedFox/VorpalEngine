@@ -80,6 +80,11 @@ void LuaManager::bindEngine(sol::state& lua) {
     lua.set("UI_WIDTH", UI_WIDTH);
     lua.set("UI_HEIGHT", UI_HEIGHT);
 
+    // Global light position
+    lua.set_function("set_light_pos", [](float x, float y, float z) {
+        Engine::lightPos = glm::vec3(x, y, z);
+    });
+
     lua.new_usertype<Scene>("Scene",
         "add_object", &Scene::add_object,
         "create_object", &Scene::create_object,

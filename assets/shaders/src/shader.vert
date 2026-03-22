@@ -3,6 +3,7 @@
 layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
+    mat4 lightSpaceMatrix;
     vec3 lightPos;
     float time;
     vec3 camPos;
@@ -44,6 +45,7 @@ layout(location = 8) out vec3 outFragPos;
 layout(location = 9) out vec2 outTexCoords;
 layout(location = 10) out mat3 outTBN;
 layout(location = 13) flat out int f_mrID;
+layout(location = 14) out vec4 outFragPosLightSpace;
 
 void main() {
     vec4 worldPos = PushConstants.model * vec4(inPosition * 0.01, 1.0);
@@ -53,6 +55,7 @@ void main() {
     outTexCoords = inTexCoord;
     f_textureID = textureID;
     f_mrID = inMRID;
+    outFragPosLightSpace = ubo.lightSpaceMatrix * worldPos;
     
     mat3 normalMatrix = mat3(transpose(inverse(PushConstants.model)));
     vec3 N = normalize(normalMatrix * aNormal);

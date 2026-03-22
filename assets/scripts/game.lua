@@ -15,6 +15,9 @@ end
 function setup(scene)
     print("Rescue Mission Setup!")
     
+    -- Set sun position for shadows and visibility
+    set_light_pos(500, 500, 500)
+
     -- Load Map
     local map = scene:create_object("assets/models/flatgrass.glb")
     map:setPosition(vec3.new(0, -5, 0))

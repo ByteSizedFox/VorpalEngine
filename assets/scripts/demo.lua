@@ -4,6 +4,9 @@ local e_pressed_last = false
 function setup(scene)
     print("Lua Setup!")
     
+    -- Set sun position
+    set_light_pos(500, 500, 500)
+
     -- Load character (C++ manages mesh lifetime)
     local mesh = scene:create_object("assets/models/male_07.glb")
     mesh:setRotation(vec3.new(0.0, radians(0.0), radians(180.0)))
