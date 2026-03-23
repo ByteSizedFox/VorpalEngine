@@ -16,59 +16,23 @@ set(ASSIMP_BUILD_DLL_EXPORT, ON)
 
 file(GLOB SRC_FILES src/*.cpp src/Engine/*.cpp src/Engine/*.c src/Platform/*.cpp src/external/imgui/*.cpp)
 
-# First, gather all files while preserving relative paths from the assets directory
-file(GLOB_RECURSE ASSET_FILES 
-    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-    "${CMAKE_CURRENT_SOURCE_DIR}/assets/*"
-)
+# Track every file under assets/ so any change triggers a zip rebuild
+file(GLOB_RECURSE ASSET_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
 
-# Create a clean directory for staging
-file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/assets")
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/assets")
-
-# Copy files to staging with clean paths
-foreach(ASSET ${ASSET_FILES})
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/${ASSET}"
-        "${CMAKE_CURRENT_BINARY_DIR}/assets/${ASSET}"
-        COPYONLY
-    )
-endforeach()
-
-# Create the zip archive from the staged directory with minimal compression
+# At build time: purge stale copy, recopy from source, repack zip
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "${CMAKE_CURRENT_BINARY_DIR}/assets"
     COMMAND zip -0 -r "${CMAKE_CURRENT_BINARY_DIR}/assets.zip" assets
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/"
-    COMMENT "Creating assets.zip with minimal compression for faster decompression"
-    VERBATIM
-)
-
-# Copy to a simple name in the binary dir
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/a.bin"
-    COMMAND ${CMAKE_COMMAND} -E copy 
-        "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
-        "${CMAKE_CURRENT_BINARY_DIR}/a.bin"
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/assets.zip"
-    COMMENT "Copying to simple filename"
-    VERBATIM
-)
-
-# Use llvm-objcopy to convert the zip to an object file
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/assets.o"
-    COMMAND cd "${CMAKE_CURRENT_BINARY_DIR}" && ${CMAKE_OBJCOPY} 
-        -I binary
-        -O elf64-x86-64
-        -B i386:x86-64
-        a.bin 
-        assets.o
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/a.bin"
-    COMMENT "Converting assets.zip to object file"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    DEPENDS ${ASSET_SOURCE_FILES}
+    COMMENT "Repacking assets.zip"
     VERBATIM
 )
+add_custom_target(assets_zip ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/assets.zip")
 
 # Apply global compiler flags to all targets
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
@@ -83,7 +47,6 @@ endif()
 
 add_executable(vorpal_engine
     ${SRC_FILES}
-    ${CMAKE_CURRENT_BINARY_DIR}/assets.o
     # volk
     external/volk/volk.c
     
@@ -105,6 +68,10 @@ add_subdirectory(external/tinygltf)
 add_subdirectory(external/miniz)
 add_subdirectory(external/lua)
 
+set(PA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(PA_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/portaudio)
+
 target_include_directories (vorpal_engine PUBLIC
     external/Vulkan-Headers/include
     external/glfw/include
@@ -116,6 +83,8 @@ target_include_directories (vorpal_engine PUBLIC
     external/miniz
     external/lua
     external/sol2/include
+    external/portaudio/include
+    external/
     ${CMAKE_CURRENT_BINARY_DIR}/external/miniz
 )
 
@@ -127,7 +96,7 @@ set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
 
 #find_package(Bullet REQUIRED)
 #target_link_libraries(vorpal_engine glfw glm assimp ${BULLET_LIBRARIES} wayland-client xkbcommon xdg-shell)
-target_link_libraries(vorpal_engine glm Bullet3Common Bullet3Collision BulletDynamics Bullet3Dynamics BulletCollision Bullet3Geometry LinearMath glfw miniz tinygltf lua)
+target_link_libraries(vorpal_engine glm Bullet3Common Bullet3Collision BulletDynamics Bullet3Dynamics BulletCollision Bullet3Geometry LinearMath glfw miniz tinygltf lua portaudio)
 target_include_directories(vorpal_engine PRIVATE include)
 target_compile_options(vorpal_engine PRIVATE -ffat-lto-objects -flto -O3 -ffast-math)
 
@@ -137,3 +106,5 @@ if (WIN32)
 endif()
 
 target_compile_features(vorpal_engine PRIVATE cxx_std_17)
+
+add_dependencies(vorpal_engine assets_zip)

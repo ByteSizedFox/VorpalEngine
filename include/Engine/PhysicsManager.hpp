@@ -54,6 +54,17 @@ namespace Physics {
         MyDebugDrawer* debugDrawer = nullptr;
         std::shared_ptr<btDiscreteDynamicsWorld> dynamicsWorld;
 
+        ~PhysicsManager() {
+            // Remove all rigid bodies from the world before it is destroyed.
+            // Bullet requires this so its broadphase/dispatcher stay consistent.
+            if (dynamicsWorld) {
+                for (int i = dynamicsWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
+                    dynamicsWorld->removeCollisionObject(
+                        dynamicsWorld->getCollisionObjectArray()[i]);
+                }
+            }
+        }
+
         void init() {
             collisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
             dispatcher = std::make_unique<btCollisionDispatcher>(collisionConfiguration.get());

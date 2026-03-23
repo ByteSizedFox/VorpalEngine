@@ -37,7 +37,17 @@ local ui_spawn_timer   = 0.0
 
 local last_e_pressed = false
 
-math.randomseed(os.time())
+-- Mix os.time() with sub-second CPU clock so rapid retries get different seeds
+math.randomseed(os.time() * 1000 + math.floor(os.clock() * 10000) % 1000)
+
+-- Audio clip IDs (loaded in setup)
+local snd_heartbeat  = -1
+local snd_spawn      = -1
+local snd_gameover   = -1
+
+-- Looping heartbeat sound instance
+local heartbeat_id      = -1
+local heartbeat_playing = false
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -85,6 +95,7 @@ local function spawn_zombie(scene)
     })
 
     new_spawn_flash = 3.0
+    audio.play(snd_spawn, false, 0.75)
     print(string.format("[HUNTED] Zombie %d spawned  speed=%.1f", zombie_count, speed))
 end
 
@@ -113,13 +124,18 @@ function setup(scene)
     for _, rp in ipairs(rock_spots) do
         local rock = scene:create_object("assets/models/rock.glb")
         local s = ROCK_SCALE * rp[3]
-        rock:setPosition(vec3.new(rp[1], -5, rp[2]))
+        rock:setPosition(vec3.new(rp[1], -7.5, rp[2]))
         rock:setScale(s, s, s)
         rock:createRigidBody(0, ColliderType.CONVEXHULL)
     end
 
     -- First zombie spawns immediately so there is instant threat
     spawn_zombie(scene)
+
+    -- Load audio clips
+    snd_heartbeat = audio.load("assets/audio/heartbeat.wav")
+    snd_spawn     = audio.load("assets/audio/zombie_spawn.wav")
+    snd_gameover  = audio.load("assets/audio/game_over.wav")
 
     set_light_pos(400, 600, 200)
     print("[HUNTED] Setup complete.")
@@ -174,6 +190,7 @@ function draw(scene, window)
         ui_spawn_timer  = spawn_timer
 
         -- Update each zombie
+        -- (heartbeat updated after loop once ui_nearest_dist is known)
         for _, z in ipairs(zombies) do
             -- Sync visual mesh to physics capsule: place model root at capsule bottom
             local physPos = z.mesh:getPhysicsPosition()
@@ -201,6 +218,9 @@ function draw(scene, window)
                 if score_time > _G._hunted_hs then
                     _G._hunted_hs = score_time
                 end
+                audio.stop_all()
+                audio.play(snd_gameover, false, 1.0)
+                heartbeat_playing = false
                 break
             end
 
@@ -230,6 +250,16 @@ function draw(scene, window)
                 local angle = math.atan(mdx, mdz)
                 z.mesh:setRotation(vec3.new(0, angle, 0))
             end
+        end
+
+        -- Heartbeat: loop when a zombie is within danger range
+        local danger = ui_nearest_dist < 20.0
+        if danger and not heartbeat_playing then
+            heartbeat_id      = audio.play(snd_heartbeat, true, 0.8)
+            heartbeat_playing = true
+        elseif not danger and heartbeat_playing then
+            audio.stop(heartbeat_id)
+            heartbeat_playing = false
         end
     end
 
@@ -309,6 +339,7 @@ function drawUI(scene, window)
         end
         imgui.spacing()
         if imgui.button("Try Again") then
+            audio.stop_all()
             scene:load_lua_scene("assets/scripts/game.lua")
         end
     end

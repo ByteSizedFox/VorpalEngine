@@ -23,7 +23,7 @@ public:
     //std::vector<Texture> textures;
     std::vector<Mesh3D*> meshes;
     std::vector<SkinnedMesh3D*> skinnedMeshes;
-    Physics::PhysicsManager *physManager;
+    Physics::PhysicsManager *physManager = nullptr;
     Camera camera;
 
     // ui mesh
@@ -77,6 +77,12 @@ public:
 
     void destroy() {
         printf("Destroy Scene\n");
+
+        // Tear down physics first: removes all rigid bodies from the dynamics
+        // world before they (and their parent meshes) are freed.
+        delete physManager;
+        physManager = nullptr;
+
         uiMesh.destroy();
         for (Mesh3D *mesh : meshes) {
             mesh->destroy();

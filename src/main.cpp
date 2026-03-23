@@ -3,15 +3,19 @@
 #include "Game/MainScene.hpp"
 #include "Game/TestScene.hpp"
 #include "Engine/LuaScene.hpp"
+#include "Engine/AudioManager.hpp"
 
-extern const char _binary_a_bin_start[];
-extern const char _binary_a_bin_end[];
+#include <fstream>
+#include <vector>
+#include <stdexcept>
+
+static std::vector<char> g_assetData;
 
 Renderer renderer;
 bool tmp = true;
 
 void setup() {
-    
+    AudioManager::get().init();
     renderer.run();
     renderer.setScene(new LuaScene("assets/scripts/game.lua"));
     Logger::success("MAIN", "Loading Finished!");
@@ -58,6 +62,7 @@ void loop(double deltaTime) {
 }
 void cleanup() {
     renderer.cleanup();
+    AudioManager::get().shutdown();
 }
 
 void mainLoop() {
@@ -104,8 +109,14 @@ void mainLoop() {
 int main() {
     Logger::info("MAIN", "Loading...");
     // test, NOTE: this code loads a model from a zip archive
-    const size_t size = _binary_a_bin_end - _binary_a_bin_start;
-    Utils::initIOSystem(_binary_a_bin_start, size);
+    {
+        std::ifstream f("assets.zip", std::ios::binary | std::ios::ate);
+        if (!f) throw std::runtime_error("assets.zip not found — run from the build directory");
+        g_assetData.resize(f.tellg());
+        f.seekg(0);
+        f.read(g_assetData.data(), g_assetData.size());
+    }
+    Utils::initIOSystem(g_assetData.data(), g_assetData.size());
 
     try {
         setup();

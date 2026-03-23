@@ -64,14 +64,14 @@ void main() {
     
     // Procedural Clouds
     if (eyeDir.y > 0.0) {
-        vec2 cloudUV = eyeDir.xz / (eyeDir.y + 0.3);
-        float cloudDensity = fbm(cloudUV * 0.5 + time * 0.02);
-        cloudDensity = smoothstep(0.4, 0.7, cloudDensity) * viewHeight; // Fade clouds at horizon
+        //vec2 cloudUV = eyeDir.xz / (eyeDir.y + 0.3);
+        //float cloudDensity = fbm(cloudUV * 0.5 + time * 0.02);
+        //cloudDensity = smoothstep(0.4, 0.7, cloudDensity) * viewHeight; // Fade clouds at horizon
         
-        vec3 cloudColor = mix(vec3(0.8, 0.85, 0.9), vec3(1.0), dayFactor);
-        cloudColor = mix(cloudColor, sunsetColor, sunsetFactor * 0.5);
+        //vec3 cloudColor = mix(vec3(0.8, 0.85, 0.9), vec3(1.0), dayFactor);
+        //cloudColor = mix(cloudColor, sunsetColor, sunsetFactor * 0.5);
         
-        color = mix(color, cloudColor, cloudDensity * 0.6);
+        //color = mix(color, cloudColor, cloudDensity * 0.6);
     }
 
     // Sun

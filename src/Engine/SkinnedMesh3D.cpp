@@ -510,6 +510,7 @@ void SkinnedMesh3D::init(const char* filename) {
         skinnedSharedGeom->vertexBufferMemory = vertexBufferMemory;
         skinnedSharedGeom->indexBuffer        = indexBuffer;
         skinnedSharedGeom->indexBufferMemory  = indexBufferMemory;
+        skinnedSharedGeom->indices            = m_indices;
         s_cache[filename] = skinnedSharedGeom;
     }
 

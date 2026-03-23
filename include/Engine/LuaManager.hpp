@@ -15,4 +15,5 @@ public:
     static void bindEngine(sol::state& lua);
     static void bindGLM(sol::state& lua);
     static void bindImGui(sol::state& lua);
+    static void bindAudio(sol::state& lua);
 };

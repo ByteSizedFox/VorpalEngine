@@ -1,6 +1,7 @@
 #include "Engine/LuaManager.hpp"
 #include "Engine/Scene.hpp"
 #include "Engine/LuaScene.hpp"
+#include "Engine/AudioManager.hpp"
 #include "config.h"
 #include <GLFW/glfw3.h>
 
@@ -16,6 +17,7 @@ void LuaManager::init() {
     bindGLM(lua);
     bindImGui(lua);
     bindEngine(lua);
+    bindAudio(lua);
 
     initialized = true;
 }
@@ -285,4 +287,28 @@ void LuaManager::bindEngine(sol::state& lua) {
     lua.set_function("sign", [](float v) -> float {
         return v < 0.0f ? -1.0f : (v > 0.0f ? 1.0f : 0.0f);
     });
+}
+
+void LuaManager::bindAudio(sol::state& lua) {
+    auto audio = lua.create_table("audio");
+
+    audio.set_function("load", [](const std::string& path) {
+        return AudioManager::get().loadClip(path);
+    });
+
+    audio.set_function("play", sol::overload(
+        [](int clipId) {
+            return AudioManager::get().play(clipId);
+        },
+        [](int clipId, bool looping) {
+            return AudioManager::get().play(clipId, looping);
+        },
+        [](int clipId, bool looping, float volume) {
+            return AudioManager::get().play(clipId, looping, volume);
+        }
+    ));
+
+    audio.set_function("stop",     [](int soundId)            { AudioManager::get().stop(soundId); });
+    audio.set_function("stop_all", []()                        { AudioManager::get().stopAll(); });
+    audio.set_function("set_volume",[](int soundId, float vol) { AudioManager::get().setVolume(soundId, vol); });
 }
