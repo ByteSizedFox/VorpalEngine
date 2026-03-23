@@ -56,7 +56,14 @@ public:
         setup();
 
         physManager = new Physics::PhysicsManager(meshes, &camera);
-        
+
+        // Register any skinned meshes that had createCapsuleRigidBody called during setup(),
+        // before physManager existed.
+        for (SkinnedMesh3D* sm : skinnedMeshes) {
+            if (sm->hasPhysics)
+                physManager->addSkinnedRigidBody(sm);
+        }
+
         isReady = true;
 
         Logger::success("Scene", "Done Loading...");
@@ -97,12 +104,21 @@ public:
     }
 
     void remove_skinned_object(SkinnedMesh3D* mesh) {
+        if (mesh->hasPhysics && physManager)
+            physManager->removeSkinnedRigidBody(mesh);
         auto it = std::find(skinnedMeshes.begin(), skinnedMeshes.end(), mesh);
         if (it != skinnedMeshes.end()) {
             (*it)->destroy();
             delete *it;
             skinnedMeshes.erase(it);
         }
+    }
+
+    // Register a skinned mesh's capsule rigid body with the physics simulation.
+    // Must be called after create_skinned_object + createCapsuleRigidBody.
+    void registerPhysics(SkinnedMesh3D* sm) {
+        if (!physManager || !sm->hasPhysics) return;
+        physManager->addSkinnedRigidBody(sm);
     }
 
     Mesh3D* create_object(const char* modelPath) {

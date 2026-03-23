@@ -11,19 +11,34 @@
 #include <vector>
 #include <stdexcept>
 
+std::unordered_map<std::string, SharedMeshGeometry*> Mesh3D::s_cache;
+
 void Mesh3D::init(const char *modelName) {
-    fileName = modelName;    
-    m_vertices.reserve(100000);
-    m_indices.reserve(100000);
+    fileName = modelName;
     loadModel(modelName);
     hasPhysics = false;
 }
 
 void Mesh3D::destroy() {
-    vkDestroyBuffer(VK::device, indexBuffer, nullptr);
-    vkFreeMemory(VK::device, indexBufferMemory, nullptr);
-    vkDestroyBuffer(VK::device, vertexBuffer, nullptr);
-    vkFreeMemory(VK::device, vertexBufferMemory, nullptr);
+    if (sharedGeom) {
+        sharedGeom->refCount--;
+        if (sharedGeom->refCount <= 0) {
+            // Last reference — free shared GPU buffers and evict from cache
+            vkDestroyBuffer(VK::device, sharedGeom->vertexBuffer, nullptr);
+            vkFreeMemory(VK::device, sharedGeom->vertexBufferMemory, nullptr);
+            vkDestroyBuffer(VK::device, sharedGeom->indexBuffer, nullptr);
+            vkFreeMemory(VK::device, sharedGeom->indexBufferMemory, nullptr);
+            s_cache.erase(fileName);
+            delete sharedGeom;
+            sharedGeom = nullptr;
+        }
+        // Shared buffers are still in use by other instances — don't free
+    } else {
+        vkDestroyBuffer(VK::device, indexBuffer, nullptr);
+        vkFreeMemory(VK::device, indexBufferMemory, nullptr);
+        vkDestroyBuffer(VK::device, vertexBuffer, nullptr);
+        vkFreeMemory(VK::device, vertexBufferMemory, nullptr);
+    }
 }
 
 void Mesh3D::createVertexBuffer() {
@@ -104,12 +119,40 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 }
 
 void Mesh3D::loadModel(const char* filename) {
-    
-    Assets::loadModel(filename, m_vertices, m_indices, AA, BB, modelCenter);
+    auto it = s_cache.find(filename);
+    if (it != s_cache.end()) {
+        // Cache hit: reuse parsed geometry and GPU buffers
+        sharedGeom = it->second;
+        sharedGeom->refCount++;
+        m_vertices   = sharedGeom->vertices;   // CPU copy needed for createRigidBody
+        m_indices    = sharedGeom->indices;
+        AA           = sharedGeom->AA;
+        BB           = sharedGeom->BB;
+        modelCenter  = sharedGeom->modelCenter;
+        vertexBuffer       = sharedGeom->vertexBuffer;
+        vertexBufferMemory = sharedGeom->vertexBufferMemory;
+        indexBuffer        = sharedGeom->indexBuffer;
+        indexBufferMemory  = sharedGeom->indexBufferMemory;
+    } else {
+        // Cache miss: parse from disk and upload to GPU
+        sharedGeom = new SharedMeshGeometry();
+        sharedGeom->refCount = 1;
+        Assets::loadModel(filename, sharedGeom->vertices, sharedGeom->indices,
+                          sharedGeom->AA, sharedGeom->BB, sharedGeom->modelCenter);
+        m_vertices  = sharedGeom->vertices;
+        m_indices   = sharedGeom->indices;
+        AA          = sharedGeom->AA;
+        BB          = sharedGeom->BB;
+        modelCenter = sharedGeom->modelCenter;
+        createVertexBuffer();
+        createIndexBuffer();
+        sharedGeom->vertexBuffer       = vertexBuffer;
+        sharedGeom->vertexBufferMemory = vertexBufferMemory;
+        sharedGeom->indexBuffer        = indexBuffer;
+        sharedGeom->indexBufferMemory  = indexBufferMemory;
+        s_cache[filename] = sharedGeom;
+    }
     updateModelMatrix();
-    
-    createVertexBuffer();
-    createIndexBuffer();
 }
 
 extern std::vector<Texture> textures;
@@ -226,7 +269,16 @@ void Mesh3D::loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_i
 }
 
 void Mesh3D::setLinearVelocity(glm::vec3 velocity) {
-    if (hasPhysics) {
+    if (hasPhysics)
         rigidBody->setLinearVelocity(worldToPhysics(velocity));
-    }
+}
+
+glm::vec3 Mesh3D::getLinearVelocity() const {
+    if (!hasPhysics) return glm::vec3(0.0f);
+    return physicsToWorld(rigidBody->getLinearVelocity());
+}
+
+glm::vec3 Mesh3D::getPhysicsPosition() const {
+    if (!hasPhysics) return position;
+    return physicsToWorld(rigidBody->getInterpolationWorldTransform().getOrigin());
 }

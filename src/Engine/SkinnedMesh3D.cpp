@@ -13,7 +13,7 @@
 // ---- Vulkan buffer helpers (reuse engine helpers) -------------------------
 
 void SkinnedMesh3D::createVertexBuffer() {
-    VkDeviceSize size = sizeof(SkinnedVertex) * m_vertices.size();
+    VkDeviceSize size = sizeof(SkinnedVertex) * m_skinnedVertices.size();
     VkBuffer staging; VkDeviceMemory stagingMem;
     Memory::createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -21,7 +21,7 @@ void SkinnedMesh3D::createVertexBuffer() {
 
     void* data;
     vkMapMemory(VK::device, stagingMem, 0, size, 0, &data);
-    memcpy(data, m_vertices.data(), size);
+    memcpy(data, m_skinnedVertices.data(), size);
     vkUnmapMemory(VK::device, stagingMem);
 
     Memory::createBuffer(size,
@@ -363,8 +363,8 @@ void SkinnedMesh3D::loadSkinnedModel(const char* filename) {
 
             // Build vertices
             size_t vertCount = posAcc.count;
-            size_t baseIndex = m_vertices.size();
-            m_vertices.reserve(m_vertices.size() + vertCount);
+            size_t baseIndex = m_skinnedVertices.size();
+            m_skinnedVertices.reserve(m_skinnedVertices.size() + vertCount);
 
             for (size_t v = 0; v < vertCount; v++) {
                 SkinnedVertex sv{};
@@ -413,7 +413,7 @@ void SkinnedMesh3D::loadSkinnedModel(const char* filename) {
                     if (idx < 0 || idx >= MAX_BONES) idx = 0;
                 }
 
-                m_vertices.push_back(sv);
+                m_skinnedVertices.push_back(sv);
             }
 
             // Indices
@@ -435,62 +435,143 @@ void SkinnedMesh3D::loadSkinnedModel(const char* filename) {
         }
     }
 
-    if (!m_vertices.empty()) {
+    if (!m_skinnedVertices.empty()) {
         AA = minV; BB = maxV;
-        modelCenter /= (float)m_vertices.size();
+        modelCenter /= (float)m_skinnedVertices.size();
     }
 }
+
+// ---- Geometry cache -------------------------------------------------------
+
+std::unordered_map<std::string, SharedSkinnedGeometry*> SkinnedMesh3D::s_cache;
 
 // ---- Public interface ----------------------------------------------------
 
 void SkinnedMesh3D::init(const char* filename) {
     fileName = filename;
-    loadSkinnedModel(filename);
-    updateModelMatrix();
-    createVertexBuffer();
-    createIndexBuffer();
-    createBoneBuffers();
-    // Pick the first spine bone (by name), skipping any IK helpers.
-    // Falls back to joint 0 if no spine bone is found.
-    if (hasSkin && !joints.empty()) {
-        auto nameContains = [&](int ji, const char* substr) {
-            std::string lower(joints[ji].name.size(), '\0');
-            std::transform(joints[ji].name.begin(), joints[ji].name.end(), lower.begin(), ::tolower);
-            return lower.find(substr) != std::string::npos;
-        };
 
-        testBoneIndex = 0; // fallback
-        for (int j = 0; j < (int)joints.size(); j++) {
-            if (nameContains(j, "spine") &&
-                !nameContains(j, "ik") &&
-                !nameContains(j, "pole") &&
-                !nameContains(j, "target") &&
-                !nameContains(j, "ctrl")) {
-                testBoneIndex = j;
-                break;
+    auto it = s_cache.find(filename);
+    if (it != s_cache.end()) {
+        // Cache hit: reuse parsed skeleton, animations, and GPU geometry buffers.
+        skinnedSharedGeom = it->second;
+        skinnedSharedGeom->refCount++;
+
+        // Copy bind-pose joint hierarchy as the working state for this instance.
+        joints     = skinnedSharedGeom->joints;
+        animations = skinnedSharedGeom->animations;
+        hasSkin    = skinnedSharedGeom->hasSkin;
+        testBoneIndex = skinnedSharedGeom->testBoneIndex;
+        AA = skinnedSharedGeom->AA; BB = skinnedSharedGeom->BB; modelCenter = skinnedSharedGeom->modelCenter;
+        // Index count is needed by draw() — copy the index vector (uint32 only, cheap)
+        m_indices = skinnedSharedGeom->indices;
+
+        // Reference shared GPU vertex/index buffers (not owned by this instance).
+        vertexBuffer       = skinnedSharedGeom->vertexBuffer;
+        vertexBufferMemory = skinnedSharedGeom->vertexBufferMemory;
+        indexBuffer        = skinnedSharedGeom->indexBuffer;
+        indexBufferMemory  = skinnedSharedGeom->indexBufferMemory;
+    } else {
+        // Cache miss: parse from disk, upload geometry, populate cache.
+        skinnedSharedGeom = new SharedSkinnedGeometry();
+        skinnedSharedGeom->refCount = 1;
+
+        loadSkinnedModel(filename);   // fills m_skinnedVertices, m_indices, joints, animations, hasSkin, AA/BB
+
+        createVertexBuffer();
+        createIndexBuffer();
+
+        // Pick test bone (same result for every instance of this model).
+        if (hasSkin && !joints.empty()) {
+            auto nameContains = [&](int ji, const char* substr) {
+                std::string lower(joints[ji].name.size(), '\0');
+                std::transform(joints[ji].name.begin(), joints[ji].name.end(), lower.begin(), ::tolower);
+                return lower.find(substr) != std::string::npos;
+            };
+            testBoneIndex = 0;
+            for (int j = 0; j < (int)joints.size(); j++) {
+                if (nameContains(j, "spine") &&
+                    !nameContains(j, "ik") &&
+                    !nameContains(j, "pole") &&
+                    !nameContains(j, "target") &&
+                    !nameContains(j, "ctrl")) {
+                    testBoneIndex = j;
+                    break;
+                }
             }
         }
-        testBonePhase = (float)(rand() % 628) / 100.0f;
+
+        // Stash everything in the cache.
+        skinnedSharedGeom->joints      = joints;
+        skinnedSharedGeom->animations  = animations;
+        skinnedSharedGeom->hasSkin     = hasSkin;
+        skinnedSharedGeom->testBoneIndex = testBoneIndex;
+        skinnedSharedGeom->AA = AA; skinnedSharedGeom->BB = BB; skinnedSharedGeom->modelCenter = modelCenter;
+        skinnedSharedGeom->vertexBuffer       = vertexBuffer;
+        skinnedSharedGeom->vertexBufferMemory = vertexBufferMemory;
+        skinnedSharedGeom->indexBuffer        = indexBuffer;
+        skinnedSharedGeom->indexBufferMemory  = indexBufferMemory;
+        s_cache[filename] = skinnedSharedGeom;
     }
 
+    testBonePhase = (float)(rand() % 628) / 100.0f;
+    boneMatrices.resize(joints.size(), glm::mat4(1.0f));
+    updateModelMatrix();
+    createBoneBuffers();
 }
 
 void SkinnedMesh3D::destroy() {
-    vkDestroyBuffer(VK::device, indexBuffer, nullptr);
-    vkFreeMemory(VK::device, indexBufferMemory, nullptr);
-    vkDestroyBuffer(VK::device, vertexBuffer, nullptr);
-    vkFreeMemory(VK::device, vertexBufferMemory, nullptr);
+    if (skinnedSharedGeom) {
+        skinnedSharedGeom->refCount--;
+        if (skinnedSharedGeom->refCount <= 0) {
+            // Last instance — release shared GPU buffers.
+            vkDestroyBuffer(VK::device, skinnedSharedGeom->vertexBuffer, nullptr);
+            vkFreeMemory(VK::device, skinnedSharedGeom->vertexBufferMemory, nullptr);
+            vkDestroyBuffer(VK::device, skinnedSharedGeom->indexBuffer, nullptr);
+            vkFreeMemory(VK::device, skinnedSharedGeom->indexBufferMemory, nullptr);
+            s_cache.erase(fileName);
+            delete skinnedSharedGeom;
+            skinnedSharedGeom = nullptr;
+        }
+        // Don't free instance handles — they point into the shared geometry.
+    } else {
+        vkDestroyBuffer(VK::device, indexBuffer, nullptr);
+        vkFreeMemory(VK::device, indexBufferMemory, nullptr);
+        vkDestroyBuffer(VK::device, vertexBuffer, nullptr);
+        vkFreeMemory(VK::device, vertexBufferMemory, nullptr);
+    }
 
+    // Per-instance bone SSBOs and descriptor pool are always owned by this instance.
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(VK::device, boneBuffers[i], nullptr);
         vkFreeMemory(VK::device, boneBufferMemories[i], nullptr);
     }
-
     if (boneDescriptorPool != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(VK::device, boneDescriptorPool, nullptr);
         boneDescriptorPool = VK_NULL_HANDLE;
     }
 }
+
+void SkinnedMesh3D::createCapsuleRigidBody(float mass, float radius, float height) {
+    hasPhysics = true;
+
+    btCollisionShape* shape = new btCapsuleShape(radius, height);
+    shape->setMargin(0.001f);
+
+    // Place capsule centre at the mesh position
+    btTransform t;
+    t.setIdentity();
+    t.setOrigin(btVector3(position.x, position.y, position.z));
+
+    btVector3 inertia(0, 0, 0);
+    if (mass > 0.0f) shape->calculateLocalInertia(mass, inertia);
+
+    btDefaultMotionState* ms = new btDefaultMotionState(t);
+    btRigidBody::btRigidBodyConstructionInfo ci(mass, ms, shape, inertia);
+    rigidBody = new btRigidBody(ci);
+    rigidBody->setAngularFactor(btVector3(0, 0, 0));
+    rigidBody->setActivationState(DISABLE_DEACTIVATION);
+}
+
 
 void SkinnedMesh3D::updateAnimation(float dt) {
     if (!hasSkin) return;

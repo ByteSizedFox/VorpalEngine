@@ -8,12 +8,10 @@
 #include <string>
 #include <array>
 #include <algorithm>
+#include <unordered_map>
 
-#include "volk.h"
 #include "config.h"
-#include "Engine/Vertex.hpp"
-#include "Engine/Node3D.hpp"
-#include "Engine/Engine.hpp"
+#include "Engine/Mesh3D.hpp"
 
 #define MAX_BONES 256
 
@@ -27,7 +25,7 @@ struct AnimSampler {
 
 // One channel: drives translation/rotation/scale of a single joint
 struct AnimChannel {
-    int jointIndex;   // index into SkinnedMesh3D::joints
+    int jointIndex;   // index into joints
     std::string path; // "translation", "rotation", "scale"
     int samplerIndex;
 };
@@ -50,15 +48,30 @@ struct Joint {
     glm::vec3 localScale{1.0f};
 };
 
-class SkinnedMesh3D : public Node3D {
-public:
-    std::vector<SkinnedVertex> m_vertices;
-    std::vector<uint32_t> m_indices;
-
-    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+// Geometry and skeleton shared by all instances of the same model file.
+struct SharedSkinnedGeometry {
+    std::vector<SkinnedVertex> vertices;
+    std::vector<uint32_t>      indices;
+    glm::vec3 AA{0}, BB{0}, modelCenter{0};
+    VkBuffer       vertexBuffer       = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-    VkBuffer indexBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
+    VkBuffer       indexBuffer        = VK_NULL_HANDLE;
+    VkDeviceMemory indexBufferMemory  = VK_NULL_HANDLE;
+    std::vector<Joint>         joints;
+    std::vector<SkinAnimation> animations;
+    bool hasSkin      = false;
+    int  testBoneIndex = -1;
+    int  refCount      = 0;
+};
+
+class SkinnedMesh3D : public Mesh3D {
+public:
+    // Skinned-geometry cache (separate from Mesh3D::s_cache — different vertex layout)
+    static std::unordered_map<std::string, SharedSkinnedGeometry*> s_cache;
+    SharedSkinnedGeometry* skinnedSharedGeom = nullptr;
+
+    // Typed vertex data (Mesh3D::m_vertices holds Vertex; this holds SkinnedVertex)
+    std::vector<SkinnedVertex> m_skinnedVertices;
 
     // Per-frame persistently-mapped bone matrix SSBOs
     VkBuffer boneBuffers[MAX_FRAMES_IN_FLIGHT]{};
@@ -70,7 +83,7 @@ public:
     VkDescriptorSet boneDescriptorSets[MAX_FRAMES_IN_FLIGHT]{};
 
     std::vector<Joint> joints;
-    std::vector<glm::mat4> boneMatrices; // final skinning matrices to upload
+    std::vector<glm::mat4> boneMatrices;
 
     std::vector<SkinAnimation> animations;
     int currentAnimation = 0;
@@ -78,16 +91,8 @@ public:
     bool looping = true;
     bool hasSkin = false;
 
-    // Per-instance test bone: randomly chosen non-root joint that gets a
-    // sinusoidal rotation so skeletal animation is visually verifiable even
-    // on models that have no embedded animation clips.
     int testBoneIndex = -1;
     float testBonePhase = 0.0f;
-
-    float metallic = 0.0f;
-    float roughness = 0.5f;
-    std::string fileName;
-    glm::vec3 AA{0.0f}, BB{0.0f}, modelCenter{0.0f};
 
     SkinnedMesh3D() = default;
 
@@ -105,6 +110,9 @@ public:
     ModelBufferObject getModelMatrix();
 
     float animSpeed = 1.0f;
+
+    // Capsule rigid body — alternative to Mesh3D::createRigidBody for character controllers
+    void createCapsuleRigidBody(float mass, float radius = 0.3f, float height = 1.0f);
 
     void playAnimation(int index) {
         currentAnimation = std::clamp(index, 0, (int)animations.size() - 1);

@@ -24,6 +24,12 @@ local CATCH_RANGE        = 1.8
 local MAP_EDGE           = 58.0
 local ZOMBIE_SCALE       = 0.01   -- Mixamo GLB geometry is in cm
 
+-- Capsule dims — must match createCapsuleRigidBody call below
+local CAPSULE_RADIUS     = 0.3
+local CAPSULE_HEIGHT     = 1.0
+-- Distance from capsule centre to the bottom; used to place visual root at feet level
+local CAPSULE_FOOT_OFFSET = CAPSULE_RADIUS + CAPSULE_HEIGHT * 0.5
+
 -- UI state: updated each draw(), read in drawUI()
 local ui_nearest_dist  = 999.0
 local ui_nearest_angle = 0.0   -- degrees relative to camera forward
@@ -40,13 +46,14 @@ math.randomseed(os.time())
 local function rand_patrol_pos()
     local a = math.random() * math.pi * 2
     local r = 8 + math.random() * 35
-    return vec3.new(math.cos(a) * r, -5, math.sin(a) * r)
+    return vec3.new(math.cos(a) * r, 0, math.sin(a) * r)
 end
 
 local function edge_spawn_pos()
     local a = math.random() * math.pi * 2
     local r = MAP_EDGE + 4 + math.random() * 8
-    return vec3.new(math.cos(a) * r, -5, math.sin(a) * r)
+    -- Spawn above ground so gravity drops them onto the surface
+    return vec3.new(math.cos(a) * r, 2, math.sin(a) * r)
 end
 
 local function dist2d(a, b)
@@ -65,8 +72,11 @@ local function spawn_zombie(scene)
     mesh:setScale(ZOMBIE_SCALE, ZOMBIE_SCALE, ZOMBIE_SCALE)
     mesh:playAnimation(0)
     mesh:setLooping(true)
-    -- Animate faster as the zombie is faster (feels snappier)
     mesh:setAnimSpeed(0.7 + (zombie_count - 1) * 0.1)
+    mesh:createCapsuleRigidBody(70.0, CAPSULE_RADIUS, CAPSULE_HEIGHT)
+    mesh:setFriction(0.0)
+    mesh:setDamping(0.0, 0.0)
+    scene:registerPhysics(mesh)
 
     table.insert(zombies, {
         mesh          = mesh,
@@ -165,6 +175,10 @@ function draw(scene, window)
 
         -- Update each zombie
         for _, z in ipairs(zombies) do
+            -- Sync visual mesh to physics capsule: place model root at capsule bottom
+            local physPos = z.mesh:getPhysicsPosition()
+            z.mesh:setPosition(vec3.new(physPos.x, physPos.y - CAPSULE_FOOT_OFFSET, physPos.z))
+
             local zpos = z.mesh:getPosition()
             local d    = dist2d(camPos, zpos)
 
@@ -201,16 +215,15 @@ function draw(scene, window)
                 target = z.patrol_target
             end
 
-            -- Move toward target
+            -- Drive horizontal velocity; preserve vertical (gravity) from physics
             local mdx = target.x - zpos.x
             local mdz = target.z - zpos.z
             local mlen = math.sqrt(mdx * mdx + mdz * mdz)
             if mlen > 0.1 then
                 mdx = mdx / mlen
                 mdz = mdz / mlen
-                local nx = zpos.x + mdx * z.speed * dt
-                local nz = zpos.z + mdz * z.speed * dt
-                z.mesh:setPosition(vec3.new(nx, zpos.y, nz))
+                local curVel = z.mesh:getLinearVelocity()
+                z.mesh:setLinearVelocity(vec3.new(mdx * z.speed, curVel.y, mdz * z.speed))
 
                 -- Rotate zombie to face direction of travel.
                 -- If zombies face the wrong way, add math.pi to the angle below.

@@ -105,41 +105,35 @@ void LuaManager::bindEngine(sol::state& lua) {
     // -------------------------------------------------------------------------
     lua.new_usertype<Mesh3D>("Mesh3D",
         sol::constructors<Mesh3D()>(),
-        "init",             &Mesh3D::init,
-        "setPosition",      &Mesh3D::setPosition,
-        "getPosition",      &Mesh3D::getPosition,
-        "getScale",         &Mesh3D::getScale,
+        "init",               &Mesh3D::init,
+        "setPosition",        &Mesh3D::setPosition,
+        "getPosition",        &Mesh3D::getPosition,
+        "getScale",           &Mesh3D::getScale,
         "setScale", sol::overload(
             static_cast<void (Mesh3D::*)(glm::vec3)>(&Mesh3D::setScale),
             [](Mesh3D& m, float x, float y, float z) { m.setScale(glm::vec3(x, y, z)); }
         ),
-        "setRotation",      &Mesh3D::setRotation,
-        "getRotation",      &Mesh3D::getRotation,
-        "setOrientation",   &Mesh3D::setOrientation,
-        "setVisible",       &Mesh3D::setVisible,
-        "isVisible",        &Mesh3D::isVisible,
-        "createRigidBody",  &Mesh3D::createRigidBody,
-        "setLinearVelocity",&Mesh3D::setLinearVelocity
+        "setRotation",        &Mesh3D::setRotation,
+        "getRotation",        &Mesh3D::getRotation,
+        "setOrientation",     &Mesh3D::setOrientation,
+        "setVisible",         &Mesh3D::setVisible,
+        "isVisible",          &Mesh3D::isVisible,
+        "createRigidBody",    &Mesh3D::createRigidBody,
+        "setLinearVelocity",  &Mesh3D::setLinearVelocity,
+        "getLinearVelocity",  &Mesh3D::getLinearVelocity,
+        "getPhysicsPosition", &Mesh3D::getPhysicsPosition,
+        "setFriction",        &Mesh3D::setFriction,
+        "setRestitution",     &Mesh3D::setRestitution,
+        "setDamping",         &Mesh3D::setDamping
     );
 
     // -------------------------------------------------------------------------
-    // SkinnedMesh3D
+    // SkinnedMesh3D — extends Mesh3D; only animation/capsule methods listed here
     // -------------------------------------------------------------------------
     lua.new_usertype<SkinnedMesh3D>("SkinnedMesh3D",
         sol::constructors<SkinnedMesh3D()>(),
+        sol::base_classes, sol::bases<Mesh3D>(),
         "init",             &SkinnedMesh3D::init,
-        "setPosition",      &SkinnedMesh3D::setPosition,
-        "getPosition",      &SkinnedMesh3D::getPosition,
-        "getScale",         &SkinnedMesh3D::getScale,
-        "setScale", sol::overload(
-            static_cast<void (SkinnedMesh3D::*)(glm::vec3)>(&SkinnedMesh3D::setScale),
-            [](SkinnedMesh3D& m, float x, float y, float z) { m.setScale(glm::vec3(x, y, z)); }
-        ),
-        "setRotation",      &SkinnedMesh3D::setRotation,
-        "getRotation",      &SkinnedMesh3D::getRotation,
-        "setOrientation",   &SkinnedMesh3D::setOrientation,
-        "setVisible",       &SkinnedMesh3D::setVisible,
-        "isVisible",        &SkinnedMesh3D::isVisible,
         "playAnimation",    &SkinnedMesh3D::playAnimation,
         "setLooping",       &SkinnedMesh3D::setLooping,
         "setAnimSpeed",     &SkinnedMesh3D::setAnimSpeed,
@@ -148,7 +142,12 @@ void LuaManager::bindEngine(sol::state& lua) {
         "getJointCount",    &SkinnedMesh3D::getJointCount,
         "getTestBoneIndex", &SkinnedMesh3D::getTestBoneIndex,
         "getAnimCount",     &SkinnedMesh3D::getAnimCount,
-        "getAnimTime",      &SkinnedMesh3D::getAnimTime
+        "getAnimTime",      &SkinnedMesh3D::getAnimTime,
+        "createCapsuleRigidBody", sol::overload(
+            [](SkinnedMesh3D& m, float mass) { m.createCapsuleRigidBody(mass); },
+            [](SkinnedMesh3D& m, float mass, float radius) { m.createCapsuleRigidBody(mass, radius); },
+            [](SkinnedMesh3D& m, float mass, float radius, float height) { m.createCapsuleRigidBody(mass, radius, height); }
+        )
     );
 
     // -------------------------------------------------------------------------
@@ -185,6 +184,7 @@ void LuaManager::bindEngine(sol::state& lua) {
         "create_skinned_object", &Scene::create_skinned_object,
         "remove_object",         &Scene::remove_object,
         "remove_skinned_object", &Scene::remove_skinned_object,
+        "registerPhysics",       &Scene::registerPhysics,
         "load_lua_scene",        &Scene::load_lua_scene,
         "handleUIInteraction",   &Scene::handleUIInteraction,
         "camera",                &Scene::camera,

@@ -10,6 +10,7 @@
 
 // engine includes
 #include "Mesh3D.hpp"
+#include "SkinnedMesh3D.hpp"
 #include "Camera.hpp"
 #include "DebugMesh.hpp"
 #include "Engine.hpp"
@@ -40,6 +41,7 @@ public:
 namespace Physics {
     class PhysicsManager {
         std::vector<Mesh3D*> meshes;
+        std::vector<SkinnedMesh3D*> skinnedMeshes; // runtime-registered character bodies
         Camera *camera;
 
         std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;
@@ -94,6 +96,16 @@ namespace Physics {
             init();
         }
 
+        void addSkinnedRigidBody(SkinnedMesh3D* sm) {
+            dynamicsWorld->addRigidBody(sm->rigidBody);
+            skinnedMeshes.push_back(sm);
+        }
+
+        void removeSkinnedRigidBody(SkinnedMesh3D* sm) {
+            dynamicsWorld->removeRigidBody(sm->rigidBody);
+            skinnedMeshes.erase(std::remove(skinnedMeshes.begin(), skinnedMeshes.end(), sm), skinnedMeshes.end());
+        }
+
         void syncMesh(Mesh3D *mesh, btRigidBody *body) {
             btVector3 pos = body->getInterpolationWorldTransform().getOrigin();
             btQuaternion rot = body->getInterpolationWorldTransform().getRotation();
@@ -125,11 +137,10 @@ namespace Physics {
 
             camera->setPosition(physicsToWorld(camera->rigidBody->getInterpolationWorldTransform().getOrigin()) + glm::vec3(0.0, 0.25, 0.0));
             for (Mesh3D* mesh : meshes) {
-                if (!mesh->hasPhysics) { // skip non-physics meshes
-                    continue;
-                }
+                if (!mesh->hasPhysics) continue;
                 syncMesh(mesh, mesh->rigidBody);
             }
+            // Skinned mesh visual positions are Lua-controlled via getPhysicsPosition().
         }
     };
 }
