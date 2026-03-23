@@ -58,7 +58,6 @@ void Mesh3D::createVertexBuffer() {
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
-    printf("Created buffer for %s: %p\n", fileName.c_str(), (void*)vertexBuffer);
 }
 void Mesh3D::createIndexBuffer() {
     VkDeviceSize bufferSize = sizeof(m_indices[0]) * m_indices.size();
@@ -85,7 +84,6 @@ void Mesh3D::createIndexBuffer() {
 
     vkDestroyBuffer(VK::device, stagingBuffer, nullptr);
     vkFreeMemory(VK::device, stagingBufferMemory, nullptr);
-    printf("Created buffer for %s: %p\n", fileName.c_str(), (void*)indexBuffer);
 }
 
 void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, int count) {
@@ -108,8 +106,6 @@ void Mesh3D::draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout
 void Mesh3D::loadModel(const char* filename) {
     
     Assets::loadModel(filename, m_vertices, m_indices, AA, BB, modelCenter);
-    printf("Model %s Range: %f %f %f -> %f %f %f\n", filename, AA.x, AA.y, AA.z, BB.x, BB.y, BB.z);
-    printf("Model Center: %f %f %f\n", modelCenter.x, modelCenter.y, modelCenter.z);
     updateModelMatrix();
     
     createVertexBuffer();
@@ -119,10 +115,9 @@ void Mesh3D::loadModel(const char* filename) {
 extern std::vector<Texture> textures;
 
 void Mesh3D::updateModelMatrix() {
-    glm::mat4 matrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0));
-    matrix = glm::translate(matrix, (position) * glm::vec3(WORLD_SCALE));
-    matrix *= glm::toMat4(orientation);
-    modelMatrix = matrix;
+    modelMatrix = glm::translate(glm::mat4(1.0f), position * glm::vec3(WORLD_SCALE))
+                * glm::toMat4(orientation)
+                * glm::scale(glm::mat4(1.0f), scale);
 }
 
 ModelBufferObject Mesh3D::getModelMatrix() {
@@ -159,8 +154,6 @@ void Mesh3D::createRigidBody(float mass, ColliderType colliderType) {
         btBoxShape *child = new btBoxShape(btVector3(size.x / 2.0, size.y / 2.0, size.z / 2.0));
 
         glm::vec3 vertCenter = -modelCenter;
-        printf("Vertex Center: %f %f %f, Model Center: 0.0, 0.0, 0.0\n", vertCenter.x, vertCenter.y, vertCenter.z);
-
         btTransform localTransform;
         localTransform.setIdentity();
         //localTransform.setOrigin(btVector3(vertCenter.x, vertCenter.y, vertCenter.z));
@@ -201,11 +194,12 @@ void Mesh3D::createRigidBody(float mass, ColliderType colliderType) {
     bodyTransform.setOrigin(btVector3(position.x, position.y, position.z));
     bodyTransform.setRotation(btQuaternion(orientation.x, orientation.y, orientation.z, orientation.w));
 
+    collisionShape->setLocalScaling(btVector3(scale.x, scale.y, scale.z));
+
     btVector3 localInertia(0, 0, 0);
     if (mass != 0.0) {
         collisionShape->calculateLocalInertia(mass, localInertia);
     }
-    printf("Body Inertia: %f %f %f\n", localInertia.getX(), localInertia.getY(), localInertia.getZ());
 
     btDefaultMotionState* motionState = new btDefaultMotionState(bodyTransform);
 
@@ -229,4 +223,10 @@ void Mesh3D::loadRaw(std::vector<Vertex> &m_vertices, std::vector<uint32_t> &m_i
     createIndexBuffer();
 
     hasPhysics = false;
+}
+
+void Mesh3D::setLinearVelocity(glm::vec3 velocity) {
+    if (hasPhysics) {
+        rigidBody->setLinearVelocity(worldToPhysics(velocity));
+    }
 }

@@ -1,0 +1,161 @@
+[[38;5;33mINFO[39m] [2026-03-22 18:53:51] [+0ms] [MAIN] Loading...
+[[38;5;33mINFO[39m] [2026-03-22 18:53:51] [+0ms] [Renderer Run] Init Window...
+[[38;5;33mINFO[39m] [2026-03-22 18:53:51] [+151ms] [Renderer Run] Init Vulkan...
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_asahi.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_broadcom.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_dzn.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_freedreno.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_intel_hasvk.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_intel.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_lvp.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_nouveau.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_panfrost.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_powervr_mesa.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_radeon.so
+validation layer: Searching for ICD drivers named /usr/lib64/libvulkan_virtio.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_asahi.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_broadcom.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_dzn.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_freedreno.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_intel_hasvk.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_intel.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_lvp.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_nouveau.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_panfrost.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_powervr_mesa.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_radeon.so
+validation layer: Searching for ICD drivers named /usr/lib/libvulkan_virtio.so
+validation layer: Loading layer library libVkLayer_khronos_validation.so
+validation layer: Loading layer library libVkLayer_MESA_device_select.so
+validation layer: terminator_CreateInstance: Received return code -3 from call to vkCreateInstance in ICD /usr/lib64/libvulkan_dzn.so. Skipping this driver.
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: Copying old device 0 into new device 0
+validation layer: Copying old device 1 into new device 1
+validation layer: Copying old device 2 into new device 2
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState->pVertexAttributeDescriptions[5].format (VK_FORMAT_R32_SINT) at Location 5 does not match vertex shader input type (vec3 of float32).
+The Vulkan spec states: If the pipeline requires vertex input state and pVertexInputState is not dynamic, then the numeric type associated with all Input variables of the corresponding Location in the Vertex Execution Model OpEntryPoint must be the same as VkVertexInputAttributeDescription::format (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-VkGraphicsPipelineCreateInfo-Input-08733)
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 7 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) VK_SHADER_STAGE_VERTEX_BIT has an Output value declared at Location 13 Component 0, but there is no corresponding Input declared in VK_SHADER_STAGE_FRAGMENT_BIT.
+This is not invalid, but might the write to to the unused Output is discarded.
+The Output variable is:
+  pointer to Output -> sint32
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 1 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 2 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 3 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 4 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 5 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 6 not consumed by vertex shader.
+validation layer: vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 7 not consumed by vertex shader.
+validation layer: (Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCreateGraphicsPipelines(): pCreateInfos[0].pVertexInputState Vertex attribute at location 1 not consumed by vertex shader.
+Model assets/models/skybox.glb Range: -1.000000 -1.000000 -1.000000 -> 1.000000 1.000000 1.000000
+Model Center: 0.000000 0.000000 0.000000
+Created buffer for assets/models/skybox.glb: 0x4c000000004c
+Created buffer for assets/models/skybox.glb: 0x500000000050
+validation layer: vkGetPhysicalDeviceFeatures2(): pFeatures->sType must be VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2.
+The Vulkan spec states: sType must be VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 (https://docs.vulkan.org/spec/latest/chapters/features.html#VUID-VkPhysicalDeviceFeatures2-sType-sType)
+[[38;5;33mINFO[39m] [2026-03-22 18:53:52] [+80ms] [Renderer Run] Init ImGui...
+[[38;5;40mSUCCESS[39m] [2026-03-22 18:53:52] [+1ms] [Renderer Run] Init Done!
+[[38;5;33mINFO[39m] [2026-03-22 18:53:52] [+0ms] [Scene] Loading Scene...
+Created buffer for UIMesh: 0x620000000062
+Created buffer for UIMesh: 0x660000000066
+Model assets/models/flatgrass.glb Range: -158.720001 -0.859653 -158.720032 -> 158.720001 4.260410 158.719940
+Model Center: 0.000000 0.000000 0.000000
+Created buffer for assets/models/flatgrass.glb: 0x880000000088
+Created buffer for assets/models/flatgrass.glb: 0x8c000000008c
+Body Inertia: 0.000000 0.000000 0.000000
+  Joints for assets/models/Waving.glb:
+    [  0] parent=-1   mixamorig_Hips
+    [  1] parent=0    mixamorig_Spine
+    [  2] parent=1    mixamorig_Spine1
+    [  3] parent=2    mixamorig_Spine2
+    [  4] parent=3    mixamorig_Neck
+    [  5] parent=4    mixamorig_Head
+    [  6] parent=5    mixamorig_HeadTop_End
+    [  7] parent=3    mixamorig_RightShoulder
+    [  8] parent=7    mixamorig_RightArm
+    [  9] parent=8    mixamorig_RightForeArm
+    [ 10] parent=9    mixamorig_RightHand
+    [ 11] parent=10   mixamorig_RightHandThumb1
+    [ 12] parent=11   mixamorig_RightHandThumb2
+    [ 13] parent=12   mixamorig_RightHandThumb3
+    [ 14] parent=13   mixamorig_RightHandThumb4
+    [ 15] parent=10   mixamorig_RightHandIndex1
+    [ 16] parent=15   mixamorig_RightHandIndex2
+    [ 17] parent=16   mixamorig_RightHandIndex3
+    [ 18] parent=17   mixamorig_RightHandIndex4
+    [ 19] parent=10   mixamorig_RightHandMiddle1
+    [ 20] parent=19   mixamorig_RightHandMiddle2
+    [ 21] parent=20   mixamorig_RightHandMiddle3
+    [ 22] parent=21   mixamorig_RightHandMiddle4
+    [ 23] parent=10   mixamorig_RightHandRing1
+    [ 24] parent=23   mixamorig_RightHandRing2
+    [ 25] parent=24   mixamorig_RightHandRing3
+    [ 26] parent=25   mixamorig_RightHandRing4
+    [ 27] parent=10   mixamorig_RightHandPinky1
+    [ 28] parent=27   mixamorig_RightHandPinky2
+    [ 29] parent=28   mixamorig_RightHandPinky3
+    [ 30] parent=29   mixamorig_RightHandPinky4
+    [ 31] parent=3    mixamorig_LeftShoulder
+    [ 32] parent=31   mixamorig_LeftArm
+    [ 33] parent=32   mixamorig_LeftForeArm
+    [ 34] parent=33   mixamorig_LeftHand
+    [ 35] parent=34   mixamorig_LeftHandThumb1
+    [ 36] parent=35   mixamorig_LeftHandThumb2
+    [ 37] parent=36   mixamorig_LeftHandThumb3
+    [ 38] parent=37   mixamorig_LeftHandThumb4
+    [ 39] parent=34   mixamorig_LeftHandIndex1
+    [ 40] parent=39   mixamorig_LeftHandIndex2
+    [ 41] parent=40   mixamorig_LeftHandIndex3
+    [ 42] parent=41   mixamorig_LeftHandIndex4
+    [ 43] parent=34   mixamorig_LeftHandMiddle1
+    [ 44] parent=43   mixamorig_LeftHandMiddle2
+    [ 45] parent=44   mixamorig_LeftHandMiddle3
+    [ 46] parent=45   mixamorig_LeftHandMiddle4
+    [ 47] parent=34   mixamorig_LeftHandRing1
+    [ 48] parent=47   mixamorig_LeftHandRing2
+    [ 49] parent=48   mixamorig_LeftHandRing3
+    [ 50] parent=49   mixamorig_LeftHandRing4
+    [ 51] parent=34   mixamorig_LeftHandPinky1
+    [ 52] parent=51   mixamorig_LeftHandPinky2
+    [ 53] parent=52   mixamorig_LeftHandPinky3
+    [ 54] parent=53   mixamorig_LeftHandPinky4
+    [ 55] parent=0    mixamorig_RightUpLeg
+    [ 56] parent=55   mixamorig_RightLeg
+    [ 57] parent=56   mixamorig_RightFoot
+    [ 58] parent=57   mixamorig_RightToeBase
+    [ 59] parent=58   mixamorig_RightToe_End
+    [ 60] parent=0    mixamorig_LeftUpLeg
+    [ 61] parent=60   mixamorig_LeftLeg
+    [ 62] parent=61   mixamorig_LeftFoot
+    [ 63] parent=62   mixamorig_LeftToeBase
+    [ 64] parent=63   mixamorig_LeftToe_End
+  Test bone: [1] mixamorig_Spine
+SkinnedMesh3D loaded: assets/models/Waving.glb  joints=65  animations=1  testBone=1
+Loaded: joints=65  anims=1  testBone=1
+[[38;5;40mSUCCESS[39m] [2026-03-22 18:53:52] [+296ms] [Scene] Done Loading...
+[[38;5;40mSUCCESS[39m] [2026-03-22 18:53:52] [+564ms] [MAIN] Loading Finished!
+FPS: 337
+FPS: 327
+FPS: 322
+radv/amdgpu: The CS has been cancelled because the context is lost. This context is innocent.
+validation layer: vkQueueSubmit() failed (VK_ERROR_DEVICE_LOST)
+validation layer: Timeline mode is ASSISTED.
+failed to submit draw command buffer!

@@ -12,6 +12,7 @@
 
 #include "Engine/PhysicsManager.hpp"
 #include "Engine/Camera.hpp"
+#include "Engine/SkinnedMesh3D.hpp"
 
 // forward declaration
 class Renderer;
@@ -21,6 +22,7 @@ class Scene {
 public:
     //std::vector<Texture> textures;
     std::vector<Mesh3D*> meshes;
+    std::vector<SkinnedMesh3D*> skinnedMeshes;
     Physics::PhysicsManager *physManager;
     Camera camera;
 
@@ -71,19 +73,49 @@ public:
         uiMesh.destroy();
         for (Mesh3D *mesh : meshes) {
             mesh->destroy();
-            delete mesh; // Clean up the meshes created by create_object
+            delete mesh;
         }
         meshes.clear();
+        for (SkinnedMesh3D *mesh : skinnedMeshes) {
+            mesh->destroy();
+            delete mesh;
+        }
+        skinnedMeshes.clear();
     }
 
     void add_object(Mesh3D *mesh) {
         meshes.push_back(mesh);
     }
 
+    void remove_object(Mesh3D* mesh) {
+        auto it = std::find(meshes.begin(), meshes.end(), mesh);
+        if (it != meshes.end()) {
+            (*it)->destroy();
+            delete *it;
+            meshes.erase(it);
+        }
+    }
+
+    void remove_skinned_object(SkinnedMesh3D* mesh) {
+        auto it = std::find(skinnedMeshes.begin(), skinnedMeshes.end(), mesh);
+        if (it != skinnedMeshes.end()) {
+            (*it)->destroy();
+            delete *it;
+            skinnedMeshes.erase(it);
+        }
+    }
+
     Mesh3D* create_object(const char* modelPath) {
         Mesh3D* mesh = new Mesh3D();
         mesh->init(modelPath);
         meshes.push_back(mesh);
+        return mesh;
+    }
+
+    SkinnedMesh3D* create_skinned_object(const char* modelPath) {
+        SkinnedMesh3D* mesh = new SkinnedMesh3D();
+        mesh->init(modelPath);
+        skinnedMeshes.push_back(mesh);
         return mesh;
     }
 
@@ -112,6 +144,7 @@ public:
        
         int c = 0;
         for (Mesh3D *mesh : meshes) {
+            if (!mesh->isVisible()) continue;
             if (!mesh->hasPhysics) { // non physics-meshes dont have AABB, skip frustum culling
                 mesh->draw(commandBuffer, pipelineLayout, 1);
                 continue;
@@ -124,7 +157,7 @@ public:
             glm::vec3 max = glm::vec3(BB.getX(), BB.getY(), BB.getZ()) / glm::vec3(100.0);
 
             
-            if (camera.getFrustum().IsBoxVisible(min, max)) {
+            if (mesh->isVisible() && camera.getFrustum().IsBoxVisible(min, max)) {
                 mesh->draw(commandBuffer, pipelineLayout, 1);
                 c++;
             }

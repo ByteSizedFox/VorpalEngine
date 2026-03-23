@@ -47,6 +47,9 @@ namespace VK {
     inline VkSurfaceKHR surface;
     inline std::vector<std::string> g_texturePathList;
     inline std::unordered_map<std::string, Texture> textureMap;
+    // Set by Renderer during init so SkinnedMesh3D can allocate bone descriptor sets
+    inline VkDescriptorSetLayout boneDescriptorSetLayout = VK_NULL_HANDLE;
+    inline VkDescriptorPool sharedDescriptorPool = VK_NULL_HANDLE;
 };
 
 namespace Command {

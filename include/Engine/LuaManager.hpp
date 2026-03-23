@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include "Engine/Mesh3D.hpp"
+#include "Engine/SkinnedMesh3D.hpp"
 #include "Engine/Camera.hpp"
 #include "Engine/Window.hpp"
 

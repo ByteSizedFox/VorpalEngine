@@ -44,6 +44,16 @@ public:
     bool isKeyPressed(int key) {
         return key_pressed[key];
     }
+    int getWidth() {
+        int w, h;
+        glfwGetFramebufferSize(window, &w, &h);
+        return w;
+    }
+    int getHeight() {
+        int w, h;
+        glfwGetFramebufferSize(window, &w, &h);
+        return h;
+    }
     bool wasResized() {
         return framebufferResized;
     }

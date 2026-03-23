@@ -79,6 +79,7 @@ float ShadowCalculation(vec4 fragPosLightSpace) {
 }
 
 void main() {
+    if (f_textureID < 0 || f_textureID >= 75) { FragColor = vec4(0.8, 0.8, 0.8, 1.0); return; }
     vec4 albedoAlpha = textureIndex(0, textures, samp, inTexCoords, f_textureID);
     if (albedoAlpha.a < 0.1) discard;
     vec3 albedo = albedoAlpha.rgb;

@@ -27,6 +27,7 @@
 #include "Engine/Engine.hpp"
 #include "Engine/Vertex.hpp"
 #include "Engine/Mesh3D.hpp"
+#include "Engine/SkinnedMesh3D.hpp"
 #include "Engine/Window.hpp"
 #include "Engine/Camera.hpp"
 #include "Engine/Scene.hpp"
@@ -127,6 +128,13 @@ public:
     VkPipeline skyboxPipeline;
     VkPipeline uiPipeline;
     VkPipeline shadowPipeline;
+
+    // Skeletal animation pipelines
+    VkDescriptorSetLayout boneDescriptorSetLayout;
+    VkPipelineLayout skinnedPipelineLayout;
+    VkPipeline skinnedPipeline;
+    VkPipelineLayout shadowSkinnedPipelineLayout;
+    VkPipeline shadowSkinnedPipeline;
 
     VkImage colorImage;
     VkDeviceMemory colorImageMemory;
@@ -282,6 +290,14 @@ public:
         uiPipeline = createGraphicsPipeline(uiPipelineLayout, "assets/shaders/vert.spv", "assets/shaders/ui.frag.spv", true, true);
         shadowPipeline = createShadowPipeline(shadowPipelineLayout, "assets/shaders/shadow.vert.spv");
 
+        boneDescriptorSetLayout = createBoneDescriptorSetLayout();
+        VK::boneDescriptorSetLayout = boneDescriptorSetLayout;
+
+        skinnedPipeline       = createSkinnedPipeline(skinnedPipelineLayout,
+                                    "assets/shaders/skinned.vert.spv", "assets/shaders/frag.spv");
+        shadowSkinnedPipeline = createShadowSkinnedPipeline(shadowSkinnedPipelineLayout,
+                                    "assets/shaders/shadow_skinned.vert.spv");
+
         createDescriptorPool();        
         createSyncObjects();
         createUniformBuffers();
@@ -333,11 +349,15 @@ public:
         vkDestroyPipeline(VK::device, skyboxPipeline, nullptr);
         vkDestroyPipeline(VK::device, uiPipeline, nullptr);
         vkDestroyPipeline(VK::device, shadowPipeline, nullptr);
+        vkDestroyPipeline(VK::device, skinnedPipeline, nullptr);
+        vkDestroyPipeline(VK::device, shadowSkinnedPipeline, nullptr);
 
         vkDestroyPipelineLayout(VK::device, pipelineLayout, nullptr);
         vkDestroyPipelineLayout(VK::device, skyboxPipelineLayout, nullptr);
         vkDestroyPipelineLayout(VK::device, uiPipelineLayout, nullptr);
         vkDestroyPipelineLayout(VK::device, shadowPipelineLayout, nullptr);
+        vkDestroyPipelineLayout(VK::device, skinnedPipelineLayout, nullptr);
+        vkDestroyPipelineLayout(VK::device, shadowSkinnedPipelineLayout, nullptr);
 
         vkDestroyFramebuffer(VK::device, shadowFramebuffer, nullptr);
 
@@ -377,6 +397,7 @@ public:
         vkDestroyDescriptorPool(VK::device, descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(VK::device, descriptorSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(VK::device, uiDescriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(VK::device, boneDescriptorSetLayout, nullptr);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(VK::device, renderFinishedSemaphores[i], nullptr);
@@ -520,6 +541,7 @@ public:
 
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE;
+        deviceFeatures.robustBufferAccess = VK_TRUE;
 
         VkPhysicalDeviceVulkan12Features features {};
         memset(&features, false, sizeof(VkPhysicalDeviceVulkan12Features));
@@ -1217,7 +1239,237 @@ public:
 
         return result;
     }
-    
+
+    // Creates the descriptor set layout for set=1 (bone matrices SSBO)
+    VkDescriptorSetLayout createBoneDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding binding{};
+        binding.binding         = 0;
+        binding.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        binding.descriptorCount = 1;
+        binding.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo info{};
+        info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        info.bindingCount = 1;
+        info.pBindings    = &binding;
+
+        VkDescriptorSetLayout layout;
+        if (vkCreateDescriptorSetLayout(VK::device, &info, nullptr, &layout) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create bone descriptor set layout!");
+        return layout;
+    }
+
+    // Full-shading pipeline for skinned meshes (set0 = scene, set1 = bones)
+    VkPipeline createSkinnedPipeline(VkPipelineLayout& layout,
+                                     const char* vertPath, const char* fragPath) {
+        auto vertCode = Utils::readFileZip(vertPath);
+        auto fragCode = Utils::readFileZip(fragPath);
+        VkShaderModule vertMod = createShaderModule(vertCode);
+        VkShaderModule fragMod = createShaderModule(fragCode);
+
+        VkPipelineShaderStageCreateInfo stages[2]{};
+        stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertMod; stages[0].pName = "main";
+        stages[1].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragMod; stages[1].pName = "main";
+
+        auto binding    = SkinnedVertex::getBindingDescription();
+        auto attributes = SkinnedVertex::getAttributeDescriptions();
+
+        VkPipelineVertexInputStateCreateInfo vertexInput{};
+        vertexInput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInput.vertexBindingDescriptionCount   = 1;
+        vertexInput.pVertexBindingDescriptions      = &binding;
+        vertexInput.vertexAttributeDescriptionCount = (uint32_t)attributes.size();
+        vertexInput.pVertexAttributeDescriptions    = attributes.data();
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1; viewportState.scissorCount = 1;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType       = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth   = 1.0f;
+        rasterizer.cullMode    = VK_CULL_MODE_BACK_BIT;
+        rasterizer.frontFace   = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.rasterizationSamples = enable_multisample ? msaaSamples : VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType            = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable  = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp   = VK_COMPARE_OP_LESS;
+
+        VkPipelineColorBlendAttachmentState blendAttach{};
+        blendAttach.colorWriteMask      = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT;
+        blendAttach.blendEnable         = VK_TRUE;
+        blendAttach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        blendAttach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        blendAttach.colorBlendOp        = VK_BLEND_OP_ADD;
+        blendAttach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        blendAttach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        blendAttach.alphaBlendOp        = VK_BLEND_OP_ADD;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments    = &blendAttach;
+
+        std::vector<VkDynamicState> dynStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicState.dynamicStateCount = (uint32_t)dynStates.size();
+        dynamicState.pDynamicStates    = dynStates.data();
+
+        // Two set layouts: set=0 (scene) + set=1 (bones)
+        VkDescriptorSetLayout setLayouts[2] = { descriptorSetLayout, boneDescriptorSetLayout };
+
+        VkPushConstantRange push{};
+        push.offset     = 0;
+        push.size       = sizeof(ModelBufferObject);
+        push.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount         = 2;
+        layoutInfo.pSetLayouts            = setLayouts;
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges    = &push;
+
+        if (vkCreatePipelineLayout(VK::device, &layoutInfo, nullptr, &layout) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create skinned pipeline layout!");
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount          = 2;
+        pipelineInfo.pStages             = stages;
+        pipelineInfo.pVertexInputState   = &vertexInput;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState      = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState   = &multisampling;
+        pipelineInfo.pDepthStencilState  = &depthStencil;
+        pipelineInfo.pColorBlendState    = &colorBlending;
+        pipelineInfo.pDynamicState       = &dynamicState;
+        pipelineInfo.layout              = layout;
+        pipelineInfo.renderPass          = renderPass;
+        pipelineInfo.subpass             = 0;
+
+        VkPipeline result;
+        if (vkCreateGraphicsPipelines(VK::device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &result) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create skinned graphics pipeline!");
+
+        vkDestroyShaderModule(VK::device, fragMod, nullptr);
+        vkDestroyShaderModule(VK::device, vertMod, nullptr);
+        return result;
+    }
+
+    // Depth-only shadow pipeline for skinned meshes
+    VkPipeline createShadowSkinnedPipeline(VkPipelineLayout& layout, const char* vertPath) {
+        auto vertCode = Utils::readFileZip(vertPath);
+        VkShaderModule vertMod = createShaderModule(vertCode);
+
+        VkPipelineShaderStageCreateInfo stage{};
+        stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+        stage.module = vertMod; stage.pName = "main";
+
+        auto binding    = SkinnedVertex::getBindingDescription();
+        auto attributes = SkinnedVertex::getAttributeDescriptions();
+
+        VkPipelineVertexInputStateCreateInfo vertexInput{};
+        vertexInput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInput.vertexBindingDescriptionCount   = 1;
+        vertexInput.pVertexBindingDescriptions      = &binding;
+        vertexInput.vertexAttributeDescriptionCount = (uint32_t)attributes.size();
+        vertexInput.pVertexAttributeDescriptions    = attributes.data();
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1; viewportState.scissorCount = 1;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType            = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.polygonMode      = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth        = 1.0f;
+        rasterizer.cullMode         = VK_CULL_MODE_BACK_BIT;
+        rasterizer.frontFace        = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizer.depthBiasEnable  = VK_TRUE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType            = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable  = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.attachmentCount = 0;
+
+        std::vector<VkDynamicState> dynStates = {
+            VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS };
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicState.dynamicStateCount = (uint32_t)dynStates.size();
+        dynamicState.pDynamicStates    = dynStates.data();
+
+        VkDescriptorSetLayout setLayouts[2] = { descriptorSetLayout, boneDescriptorSetLayout };
+        VkPushConstantRange push{};
+        push.offset = 0; push.size = sizeof(ModelBufferObject);
+        push.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount         = 2;
+        layoutInfo.pSetLayouts            = setLayouts;
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges    = &push;
+
+        if (vkCreatePipelineLayout(VK::device, &layoutInfo, nullptr, &layout) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create shadow skinned pipeline layout!");
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount          = 1;
+        pipelineInfo.pStages             = &stage;
+        pipelineInfo.pVertexInputState   = &vertexInput;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState      = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState   = &multisampling;
+        pipelineInfo.pDepthStencilState  = &depthStencil;
+        pipelineInfo.pColorBlendState    = &colorBlending;
+        pipelineInfo.pDynamicState       = &dynamicState;
+        pipelineInfo.layout              = layout;
+        pipelineInfo.renderPass          = shadowRenderPass;
+        pipelineInfo.subpass             = 0;
+
+        VkPipeline result;
+        if (vkCreateGraphicsPipelines(VK::device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &result) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create shadow skinned pipeline!");
+
+        vkDestroyShaderModule(VK::device, vertMod, nullptr);
+        return result;
+    }
+
     void createFramebuffers() {
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -1546,6 +1798,17 @@ public:
                 for (Mesh3D *mesh : currentScene->meshes) {
                     mesh->draw(commandBuffer, shadowPipelineLayout, 1);
                 }
+                // Shadow pass for skinned meshes
+                if (!currentScene->skinnedMeshes.empty()) {
+                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowSkinnedPipeline);
+                    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        shadowSkinnedPipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+                    for (SkinnedMesh3D* sm : currentScene->skinnedMeshes) {
+                        if (!sm->isVisible()) continue;
+                        sm->uploadBoneMatrices(currentFrame);
+                        sm->draw(commandBuffer, shadowSkinnedPipelineLayout, currentFrame);
+                    }
+                }
             }
         vkCmdEndRenderPass(commandBuffer);
 
@@ -1599,6 +1862,16 @@ public:
 
             if (currentScene != nullptr && currentScene->isReady) {
                 currentScene->draw(commandBuffer, pipelineLayout, &window);
+
+                // Draw skinned meshes with the skinned pipeline
+                if (!currentScene->skinnedMeshes.empty()) {
+                    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skinnedPipeline);
+                    // set=0 is already bound from above; just draw each skinned mesh
+                    for (SkinnedMesh3D* sm : currentScene->skinnedMeshes) {
+                        if (!sm->isVisible()) continue;
+                        sm->draw(commandBuffer, skinnedPipelineLayout, currentFrame);
+                    }
+                }
             }
 
             // render ui mesh
@@ -1701,6 +1974,16 @@ public:
         //     recreateSwapChain(enable_multisample);
         //     updateDescriptorSets(currentFrame);
         // }
+
+        // Tick skeletal animations using wall-clock time (decoupled from the frame rate)
+        double animNow = glfwGetTime();
+        float animDt = (float)(animNow - lastAnimTime);
+        lastAnimTime = animNow;
+        if (currentScene && currentScene->isReady) {
+            for (SkinnedMesh3D* sm : currentScene->skinnedMeshes) {
+                if (sm->isVisible()) sm->updateAnimation(animDt);
+            }
+        }
 
         vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
         recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
@@ -1968,6 +2251,7 @@ public:
     }
 
     double deltaTime = 0.0;
+    double lastAnimTime = 0.0;
     bool canJump = true;
 
     void handle_input() {

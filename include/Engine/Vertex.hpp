@@ -104,6 +104,43 @@ struct StorageBufferData {
 struct StorageBufferObject {
     StorageBufferData data[10];
 };
+// Vertex with bone weights for skeletal animation
+struct SkinnedVertex {
+    glm::vec3 pos;
+    glm::vec3 normal;
+    glm::vec2 texCoord;
+    int32_t textureID{0};
+    int32_t normalID{-1};
+    int32_t metallicRoughnessID{-1};
+    glm::vec4 tangent{0.0f, 0.0f, 1.0f, 1.0f};
+    glm::vec3 bitangent{0.0f, 1.0f, 0.0f};
+    glm::ivec4 jointIndices{0, 0, 0, 0};
+    glm::vec4 jointWeights{1.0f, 0.0f, 0.0f, 0.0f};
+
+    static VkVertexInputBindingDescription getBindingDescription() {
+        VkVertexInputBindingDescription d{};
+        d.binding = 0;
+        d.stride = sizeof(SkinnedVertex);
+        d.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return d;
+    }
+
+    static std::array<VkVertexInputAttributeDescription, 10> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 10> a{};
+        a[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT,    offsetof(SkinnedVertex, pos)};
+        a[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT,    offsetof(SkinnedVertex, normal)};
+        a[2] = {2, 0, VK_FORMAT_R32G32_SFLOAT,       offsetof(SkinnedVertex, texCoord)};
+        a[3] = {3, 0, VK_FORMAT_R32_SINT,            offsetof(SkinnedVertex, textureID)};
+        a[4] = {4, 0, VK_FORMAT_R32_SINT,            offsetof(SkinnedVertex, normalID)};
+        a[5] = {5, 0, VK_FORMAT_R32_SINT,            offsetof(SkinnedVertex, metallicRoughnessID)};
+        a[6] = {6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SkinnedVertex, tangent)};
+        a[7] = {7, 0, VK_FORMAT_R32G32B32_SFLOAT,    offsetof(SkinnedVertex, bitangent)};
+        a[8] = {8, 0, VK_FORMAT_R32G32B32A32_SINT,   offsetof(SkinnedVertex, jointIndices)};
+        a[9] = {9, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SkinnedVertex, jointWeights)};
+        return a;
+    }
+};
+
 // wip
 struct ModelBufferObject {
     alignas(16) glm::mat4 model;

@@ -61,4 +61,5 @@ public:
     void draw(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout, int count);
     void updatePushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
     void createRigidBody(float mass, ColliderType colliderType);
+    void setLinearVelocity(glm::vec3 velocity);
 };
