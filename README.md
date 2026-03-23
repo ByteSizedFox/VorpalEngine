@@ -1,6 +1,8 @@
 # VorpalEngine
 Desktop + VR game engine
 
+code added past 2025 may include AI assisted development
+
 # Building
 Build Dependencies (fedora tested only)
 ```bash
